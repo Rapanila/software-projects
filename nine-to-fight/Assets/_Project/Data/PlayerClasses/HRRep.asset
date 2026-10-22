@@ -1,0 +1,111 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ebb53093947f6f439c0cbdb7f425052, type: 3}
+  m_Name: HRRep
+  m_EditorClassIdentifier: NineToFight.Runtime::NineToFight.Player.PlayerClass
+  displayName: HR Rep
+  department: People
+  tagline: '"This is going on your permanent record."'
+  perk: Slow but very hard to fire. Huge knockback keeps crowds back.
+  shirtColor: {r: 0.5568628, g: 0.42352942, b: 0.5411765, a: 1}
+  tieColor: {r: 0.9490196, g: 0.8156863, b: 0.6431373, a: 1}
+  outfit: Woman_Dress
+  maxHealth: 130
+  healthPerLevel: 20
+  moveSpeed: 5.2
+  depthSpeed: 3.6
+  jumpHeight: 1.4
+  damageMultiplier: 1.05
+  dodgeCooldown: 0.7
+  lightAttack:
+    id: policy_slap
+    displayName: Policy Slap
+    description: 'Section 4, paragraph 2: no running.'
+    slot: 0
+    prop: clipboard
+    style: 13
+    combo: 
+    unlockLevel: 1
+    damage: 9
+    reach: 0.9
+    radius: 0.65
+    height: 1.2
+    knockback: 5
+    knockUp: 0
+    hitStop: 0.04
+    hits: 1
+    healOnHit: 0
+    startup: 0.15
+    active: 0.08
+    recovery: 0.18
+    cooldown: 0
+    lunge: 1.5
+    moveMultiplier: 0.15
+  heavyAttack:
+    id: binder_of_rules
+    displayName: Binder of Rules
+    description: Three inches of policy, laminated.
+    slot: 1
+    prop: binder
+    style: 2
+    combo: 
+    unlockLevel: 1
+    damage: 20
+    reach: 1.1
+    radius: 0.9
+    height: 1.2
+    knockback: 13
+    knockUp: 4
+    hitStop: 0.08
+    hits: 1
+    healOnHit: 0
+    startup: 0.28
+    active: 0.14
+    recovery: 0.36
+    cooldown: 0
+    lunge: 3
+    moveMultiplier: 0.15
+  signatureMove:
+    id: disciplinary_action
+    displayName: Disciplinary Action
+    description: A shockwave of paperwork that hits everyone nearby.
+    slot: 2
+    prop: megaphone
+    style: 7
+    combo: 
+    unlockLevel: 2
+    damage: 24
+    reach: 0.3
+    radius: 2
+    height: 1.2
+    knockback: 14
+    knockUp: 5
+    hitStop: 0.1
+    hits: 1
+    healOnHit: 0
+    startup: 0.35
+    active: 0.18
+    recovery: 0.4
+    cooldown: 3
+    lunge: 0
+    moveMultiplier: 0.15
+  ability:
+    id: formal_complaint
+    displayName: Formal Complaint
+    description: Nobody wants the paperwork. Untouchable for 3 seconds.
+    kind: 3
+    cooldown: 14
+    amount: 0
+    damageMultiplier: 1
+    radius: 4
+    duration: 3
+    color: {r: 0.8509804, g: 0.42352942, b: 1, a: 1}

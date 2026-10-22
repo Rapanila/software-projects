@@ -1,0 +1,185 @@
+﻿{
+    "files":  [
+                  {
+                      "file":  "fight_idle.fbx",
+                      "mixamo_name":  "Bouncing Fight Idle",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "block_idle.fbx",
+                      "mixamo_name":  "Center Block",
+                      "in_place":  false,
+                      "mixamo_description":  "High Center Block"
+                  },
+                  {
+                      "file":  "hit_head.fbx",
+                      "mixamo_name":  "Head Hit",
+                      "in_place":  false,
+                      "mixamo_description":  "Receiving A Medium Hit To The Head From A Straight Punch"
+                  },
+                  {
+                      "file":  "hit_body.fbx",
+                      "mixamo_name":  "Stomach Hit",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "knockout.fbx",
+                      "mixamo_name":  "Knocked Out",
+                      "in_place":  false,
+                      "mixamo_description":  "Knocked Out Falling To Back"
+                  },
+                  {
+                      "file":  "jab.fbx",
+                      "mixamo_name":  "Lead Jab",
+                      "in_place":  false,
+                      "mixamo_description":  "Short Head Jab"
+                  },
+                  {
+                      "file":  "cross.fbx",
+                      "mixamo_name":  "Cross Punch",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "hook.fbx",
+                      "mixamo_name":  "Right Hook",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "uppercut.fbx",
+                      "mixamo_name":  "Boxing",
+                      "in_place":  false,
+                      "mixamo_description":  "Boxing Back Hand Uppercut"
+                  },
+                  {
+                      "file":  "elbow.fbx",
+                      "mixamo_name":  "Elbow Punch",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "knee.fbx",
+                      "mixamo_name":  "Illegal Knee",
+                      "in_place":  false,
+                      "mixamo_description":  "Muay Thai Illegal Knee"
+                  },
+                  {
+                      "file":  "front_kick.fbx",
+                      "mixamo_name":  "Kicking",
+                      "in_place":  false,
+                      "mixamo_description":  "Male Front Snap Kick With The Rear Foot Advancing"
+                  },
+                  {
+                      "file":  "flying_kick.fbx",
+                      "mixamo_name":  "Flying Kick",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "dropkick.fbx",
+                      "mixamo_name":  "Drop Kick",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "superman_punch.fbx",
+                      "skipped":  "No suitable single superman punch found. Searches for superman punch, superman, jumping punch, and jump punch returned no direct match; the only punch fallback was a flying-knee-and-punch combo."
+                  },
+                  {
+                      "file":  "overhead_chop.fbx",
+                      "mixamo_name":  "Standing Melee Attack Downward",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "horizontal_swing.fbx",
+                      "mixamo_name":  "Standing Melee Attack Horizontal",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "backhand.fbx",
+                      "mixamo_name":  "Standing Melee Attack Backhand",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "diagonal_slash.fbx",
+                      "mixamo_name":  "Sword And Shield Slash",
+                      "in_place":  false,
+                      "mixamo_description":  "Sword And Shield Downward Slash"
+                  },
+                  {
+                      "file":  "spin_attack.fbx",
+                      "mixamo_name":  "Standing Melee Attack 360 High",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "jump_slam.fbx",
+                      "mixamo_name":  "Standing Melee Run Jump Attack",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "two_hand_slam.fbx",
+                      "mixamo_name":  "Great Sword Slash",
+                      "in_place":  false,
+                      "mixamo_description":  "Great Sword Downward Slash"
+                  },
+                  {
+                      "file":  "two_hand_cleave.fbx",
+                      "mixamo_name":  "Great Sword High Spin Attack",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "golf_swing.fbx",
+                      "mixamo_name":  "Golf Drive",
+                      "in_place":  false,
+                      "mixamo_description":  "Golf Swing Drive Shot"
+                  },
+                  {
+                      "file":  "overhand_throw.fbx",
+                      "mixamo_name":  "Throw",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "underhand_toss.fbx",
+                      "skipped":  "No suitable underhand toss found. Toss results contained grenade/rifle, frisbee, seated dice, and overhand throws; underhand throw and underhand searches returned no matching animation."
+                  },
+                  {
+                      "file":  "shove.fbx",
+                      "mixamo_name":  "Pushing",
+                      "in_place":  false,
+                      "mixamo_description":  "Pushing An Object Forward"
+                  },
+                  {
+                      "file":  "lunge_stab.fbx",
+                      "mixamo_name":  "Stabbing",
+                      "in_place":  false,
+                      "mixamo_description":  "Male Knife Stab With The Rear Hand And Fore Grip"
+                  },
+                  {
+                      "file":  "megaphone_blast.fbx",
+                      "mixamo_name":  "Standing 1H Magic Attack 01",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "ground_pound.fbx",
+                      "mixamo_name":  "Smash",
+                      "in_place":  false,
+                      "mixamo_description":  "Smash With Back Of Rifle Or Staff"
+                  },
+                  {
+                      "file":  "windmill.fbx",
+                      "mixamo_name":  "Standing Melee Combo Attack Ver. 2",
+                      "in_place":  false
+                  },
+                  {
+                      "file":  "whip_crack.fbx",
+                      "mixamo_name":  "Stable Sword Outward Slash",
+                      "in_place":  false
+                  }
+              ],
+    "export_settings":  {
+                            "character":  "Y Bot",
+                            "format":  "FBX for Unity",
+                            "skin":  "Without Skin",
+                            "frames_per_second":  30,
+                            "keyframe_reduction":  "none",
+                            "mirror":  false,
+                            "other_sliders":  "default",
+                            "in_place":  "Enabled whenever available; none of the selected animations exposed this option."
+                        }
+}

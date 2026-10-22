@@ -1,0 +1,111 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ebb53093947f6f439c0cbdb7f425052, type: 3}
+  m_Name: Accountant
+  m_EditorClassIdentifier: NineToFight.Runtime::NineToFight.Player.PlayerClass
+  displayName: Accountant
+  department: Finance
+  tagline: '"The numbers don''t lie. Neither do bruises."'
+  perk: 'Balanced books: no strengths, no weaknesses. Good first hire.'
+  shirtColor: {r: 0.9098039, g: 0.93333334, b: 0.9607843, a: 1}
+  tieColor: {r: 0.18039216, g: 0.49019608, b: 0.35686275, a: 1}
+  outfit: Woman_Suit
+  maxHealth: 100
+  healthPerLevel: 15
+  moveSpeed: 6
+  depthSpeed: 4
+  jumpHeight: 1.6
+  damageMultiplier: 1
+  dodgeCooldown: 0.55
+  lightAttack:
+    id: calculator_jab
+    displayName: Calculator Jab
+    description: Quick and precise, to two decimal places.
+    slot: 0
+    prop: calculator
+    style: 0
+    combo: 
+    unlockLevel: 1
+    damage: 8
+    reach: 0.9
+    radius: 0.6
+    height: 1.2
+    knockback: 3
+    knockUp: 0
+    hitStop: 0.03
+    hits: 1
+    healOnHit: 0
+    startup: 0.09
+    active: 0.08
+    recovery: 0.16
+    cooldown: 0
+    lunge: 2
+    moveMultiplier: 0.15
+  heavyAttack:
+    id: ledger_slam
+    displayName: Ledger Slam
+    description: A hardback ledger, swung with conviction.
+    slot: 1
+    prop: ledger
+    style: 8
+    combo: 
+    unlockLevel: 1
+    damage: 18
+    reach: 1.1
+    radius: 0.8
+    height: 1.2
+    knockback: 9
+    knockUp: 3
+    hitStop: 0.07
+    hits: 1
+    healOnHit: 0
+    startup: 0.24
+    active: 0.12
+    recovery: 0.32
+    cooldown: 0
+    lunge: 4
+    moveMultiplier: 0.15
+  signatureMove:
+    id: audit
+    displayName: The Audit
+    description: Wide-arc smack that finds every discrepancy.
+    slot: 2
+    prop: audit_stamp
+    style: 9
+    combo: 
+    unlockLevel: 2
+    damage: 26
+    reach: 1.4
+    radius: 1.3
+    height: 1.2
+    knockback: 11
+    knockUp: 4
+    hitStop: 0.09
+    hits: 1
+    healOnHit: 0
+    startup: 0.28
+    active: 0.16
+    recovery: 0.36
+    cooldown: 2.5
+    lunge: 0
+    moveMultiplier: 0.15
+  ability:
+    id: tax_refund
+    displayName: Tax Refund
+    description: Claim it all back. Instantly restores 35 HP.
+    kind: 0
+    cooldown: 12
+    amount: 35
+    damageMultiplier: 1
+    radius: 4
+    duration: 3
+    color: {r: 0.18039216, g: 0.8, b: 0.44313726, a: 1}

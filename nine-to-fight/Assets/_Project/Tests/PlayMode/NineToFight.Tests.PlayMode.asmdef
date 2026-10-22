@@ -1,0 +1,17 @@
+{
+    "name": "NineToFight.Tests.PlayMode",
+    "rootNamespace": "NineToFight.Tests",
+    "references": [
+        "NineToFight.Runtime",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ]
+}

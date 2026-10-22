@@ -58,3 +58,6 @@ crashlytics-build.properties
 # Temporary auto-generated Android assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Temporary scenes left behind by interrupted PlayMode test runs
+/[Aa]ssets/InitTestScene*.unity*

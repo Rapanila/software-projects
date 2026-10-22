@@ -1,0 +1,15 @@
+Characters by Quaternius (https://quaternius.com), from the Ultimate Modular Men and
+Ultimate Modular Women packs, downloaded from Poly Pizza (https://poly.pizza/u/Quaternius).
+
+Licence: CC0 1.0 (public domain). Poly Pizza lists Woman_Suit under CC-BY 3.0, so credit
+"Quaternius" for it in the game credits.
+
+Man_Suit.glb      Business Man        https://poly.pizza/m/JFrLIKqvCH
+Man_Casual.glb    Casual Character    https://poly.pizza/m/kZ3DmIoGip
+Man_Hoodie.glb    Hoodie Character    https://poly.pizza/m/gKLBoRsyKe
+Woman_Suit.glb    Suit                https://poly.pizza/m/sOUciDsoVV
+Woman_Dress.glb   Animated Woman      https://poly.pizza/m/nIItLV9nxS
+Woman_Blouse.glb  Animated Woman      https://poly.pizza/m/qJ2gsTUBHL
+
+The builder (Nine to Fight > Build Starter Content) reads these files directly; the
+generated meshes live in ../Generated.

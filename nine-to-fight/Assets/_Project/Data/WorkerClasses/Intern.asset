@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d56007b3c549a34f8f58d0ea87d4827, type: 3}
+  m_Name: Intern
+  m_EditorClassIdentifier: NineToFight.Runtime::NineToFight.Enemies.WorkerClass
+  displayName: Intern
+  tagline: Unpaid and unhinged.
+  tier: 1
+  shirtColor: {r: 0.95686275, g: 0.89411765, b: 0.6313726, a: 1}
+  tieColor: {r: 0.47843137, g: 0.41568628, b: 0.22745098, a: 1}
+  scale: 0.92
+  maxHealth: 28
+  moveSpeed: 3.4
+  aggroRange: 9
+  xpReward: 15
+  poise: 0
+  role: 0
+  attackCooldown: 1.5
+  attack:
+    id: coffee_fling
+    displayName: Coffee Run
+    description: 
+    slot: 0
+    prop: coffee_cup
+    style: 5
+    combo: 
+    unlockLevel: 1
+    damage: 5
+    reach: 0.85
+    radius: 0.6
+    height: 1.2
+    knockback: 4
+    knockUp: 0
+    hitStop: 0.05
+    hits: 1
+    healOnHit: 0
+    startup: 0.45
+    active: 0.1
+    recovery: 0.35
+    cooldown: 0
+    lunge: 0
+    moveMultiplier: 0

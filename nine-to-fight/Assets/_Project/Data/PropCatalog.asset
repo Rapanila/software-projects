@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bec52b71533a35e4e881ce4f17e46d3d, type: 3}
+  m_Name: PropCatalog
+  m_EditorClassIdentifier: NineToFight.Runtime::NineToFight.Combat.PropCatalog
+  entries:
+  - id: calculator
+    displayName: Calculator
+    prefab: {fileID: 2667019902226240680, guid: bb8fec1f99c6152489a47b0d632248bc, type: 3}
+  - id: ledger
+    displayName: Ledger
+    prefab: {fileID: 4280136627214399819, guid: aa3ad0900c537cf4283dcc989da3f72b, type: 3}
+  - id: audit_stamp
+    displayName: Audit Stamp
+    prefab: {fileID: 5498966345802749289, guid: c9c118a74baedf04db09588860c7c2a8, type: 3}
+  - id: ethernet_cable
+    displayName: Ethernet Cable
+    prefab: {fileID: 1883952700644029908, guid: 96c29888163842c469753615e40664c9, type: 3}
+  - id: mouse
+    displayName: Computer Mouse
+    prefab: {fileID: 2074156031810667626, guid: 9bdc65ffeec55714b9a2ff9c407cb9c4, type: 3}
+  - id: laptop
+    displayName: Laptop
+    prefab: {fileID: 1432726474078773721, guid: f4a0da9dfe80ac047ac88b3b69a62fef, type: 3}
+  - id: smartphone
+    displayName: Smartphone
+    prefab: {fileID: 8229334042491741168, guid: f9d6120c640fd0043b8a752c55b93ea6, type: 3}
+  - id: golf_club
+    displayName: Golf Club
+    prefab: {fileID: 5749008616644929683, guid: ce684985a6894ab438b026cc668aae8b, type: 3}
+  - id: desk_phone
+    displayName: Desk Phone Handset
+    prefab: {fileID: 4332729706818333958, guid: bce0550ece5aa374aa3835b0c54a27b2, type: 3}
+  - id: clipboard
+    displayName: Clipboard
+    prefab: {fileID: 1491332204646829650, guid: 9aa08a6a704a402469e09092d4d796b9, type: 3}
+  - id: binder
+    displayName: Binder of Rules
+    prefab: {fileID: 1245965133936964796, guid: 7dabae9123d110b4f83caf98156e87fd, type: 3}
+  - id: megaphone
+    displayName: Megaphone
+    prefab: {fileID: 6607744130426132275, guid: 3a9561b0f3545284bb493b90f5d9013b, type: 3}
+  - id: keyboard
+    displayName: Keyboard
+    prefab: {fileID: 9067372387932642489, guid: a2c4682af769f224b9fe8b7b616780cb, type: 3}
+  - id: stapler
+    displayName: Stapler
+    prefab: {fileID: 4584100246018372967, guid: 7f63c4bc81908aa4fa1ffb2860169b71, type: 3}
+  - id: briefcase
+    displayName: Briefcase
+    prefab: {fileID: 5762738433396406535, guid: 1adf7889133cf00489c9893c21dd2d05, type: 3}
+  - id: coffee_cup
+    displayName: Coffee Cup
+    prefab: {fileID: 8469823341638287420, guid: 909a3a7ee7824fe439e4edee1e84073b, type: 3}
+  - id: rolled_report
+    displayName: Rolled-Up Report
+    prefab: {fileID: 8951720335766070025, guid: d48d1da60caf155468849269938d4387, type: 3}

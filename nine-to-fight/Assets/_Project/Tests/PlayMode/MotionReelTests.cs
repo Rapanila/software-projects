@@ -20,7 +20,7 @@ namespace NineToFight.Tests
     {
         static readonly string Dir = Path.GetFullPath("Builds/Screenshots/Motion");
 
-        [UnityTest]
+        [UnityTest, Category(FilmCategory.Name)]
         public IEnumerator RecordMotionReel()
         {
             if (Directory.Exists(Dir)) Directory.Delete(Dir, true);

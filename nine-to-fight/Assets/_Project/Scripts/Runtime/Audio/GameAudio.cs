@@ -79,15 +79,38 @@ namespace NineToFight.Audio
             return clip;
         }
 
-        /// <summary>Fire-and-forget sound effect with slight pitch variation so repeats don't grate.</summary>
+        /// <summary>
+        /// Fire-and-forget sound effect with slight pitch variation so repeats don't grate. Each sound gets a voice
+        /// of its own (a free one if there is one, else the oldest), so setting this sound's pitch can't bend one
+        /// still ringing out.
+        /// </summary>
         public static void Play(Sfx sfx, float volume = 1f, float pitchJitter = 0.08f)
         {
             var self = Instance;
             if (self == null) return;
-            var source = self.voices[self.nextVoice];
-            self.nextVoice = (self.nextVoice + 1) % Voices;
+            var source = self.FreeVoice();
+            source.Stop();
+            source.clip = Clip(sfx);
             source.pitch = 1f + Random.Range(-pitchJitter, pitchJitter);
-            source.PlayOneShot(Clip(sfx), volume * 0.8f * Game.GameSettings.EffectsVolume);
+            source.volume = volume * 0.8f * Game.GameSettings.EffectsVolume;
+            source.Play();
+        }
+
+        AudioSource FreeVoice()
+        {
+            for (int i = 0; i < Voices; i++)
+            {
+                var v = voices[(nextVoice + i) % Voices];
+                if (!v.isPlaying)
+                {
+                    nextVoice = (nextVoice + i + 1) % Voices;
+                    return v;
+                }
+            }
+            // All busy: take the oldest (round robin).
+            var oldest = voices[nextVoice];
+            nextVoice = (nextVoice + 1) % Voices;
+            return oldest;
         }
 
         public static void PlayMusic(MusicTrack track)

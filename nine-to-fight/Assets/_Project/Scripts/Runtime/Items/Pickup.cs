@@ -27,6 +27,13 @@ namespace NineToFight.Items
         Vector3 visualStart;
 
         public PickupKind Kind => kind;
+        public string MoveId => moveId;
+
+        /// <summary>Sets the move a training seminar teaches.</summary>
+        public void Teach(string id) => moveId = id;
+
+        /// <summary>Coffee is left on the desk while the player is already at full health.</summary>
+        public static bool WouldWaste(PickupKind kind, float current, float max) => kind == PickupKind.Coffee && current >= max - 0.01f;
 
         void Awake()
         {
@@ -49,6 +56,7 @@ namespace NineToFight.Items
         {
             var player = other.GetComponentInParent<PlayerController>();
             if (player == null || player.Health.IsDead || !GameFlow.IsPlaying) return;
+            if (WouldWaste(kind, player.Health.Current, player.Health.Max)) return; // save it for when it's needed
             string message = Apply(player);
             if (message != null) GameFlow.Instance?.Toast(message);
             Audio.GameAudio.Play(Audio.Sfx.Pickup);

@@ -22,12 +22,30 @@ namespace NineToFight.Player
         [SerializeField] float dodgeCooldown = 0.55f;
         [SerializeField] float dodgeInvulnerability = 0.3f;
 
+        /// <summary>Gap after the i-frames run out before the next dodge, so dodging can never chain into permanent invulnerability.</summary>
+        public const float DodgeVulnerableGap = 0.15f;
+
+        /// <summary>Seconds between dodges: the department's cooldown, shortened by Flex Time, never below the i-frames plus a gap.</summary>
+        public float DodgeCooldown => DodgeCooldownFor(dodgeCooldown, Perks.DodgeCooldownMultiplier, dodgeInvulnerability);
+
+        public static float DodgeCooldownFor(float classCooldown, float perkMultiplier, float invulnerability) =>
+            Mathf.Max(classCooldown * perkMultiplier, invulnerability + DodgeVulnerableGap);
+        public float DodgeInvulnerability => dodgeInvulnerability;
+
         [Header("Hit Reaction")]
         [SerializeField] float hitStun = 0.3f;
 
         bool controlEnabled;
         float stunnedUntil;
         float nextDodgeTime;
+
+        /// <summary>
+        /// Seconds an attack press is remembered while the body is busy: it fires the moment the current move
+        /// ends or opens its cancel window, so a press slightly early isn't lost.
+        /// </summary>
+        public const float AttackBufferWindow = 0.2f;
+        FightingMove bufferedMove;
+        float bufferedAt;
 
         public CharacterMotor2_5D Motor { get; private set; }
         public AttackExecutor Attack { get; private set; }
@@ -153,8 +171,10 @@ namespace NineToFight.Player
             }
 
             bool stunned = Time.time < stunnedUntil;
-            Motor.CanMove = controlEnabled && !stunned;
-            if (!controlEnabled || stunned)
+            // The pause menu reads the same keys (and mouse clicks); none of them should swing or cast.
+            bool paused = GameFlow.IsPaused;
+            Motor.CanMove = controlEnabled && !stunned && !paused;
+            if (!controlEnabled || stunned || paused)
             {
                 Motor.SetMoveInput(Vector2.zero);
                 return;
@@ -168,10 +188,40 @@ namespace NineToFight.Player
 
             int hotbarSlot = Input.HotbarPressed;
             if (hotbarSlot >= 0) TryHotbar(hotbarSlot);
-            else if (Input.LightPressed) Attack.TryAttack(Progression.MoveFor(MoveSlot.Light));
-            else if (Input.HeavyPressed) Attack.TryAttack(Progression.MoveFor(MoveSlot.Heavy));
+            else if (Input.LightPressed) RequestAttack(Progression.MoveFor(MoveSlot.Light));
+            else if (Input.HeavyPressed) RequestAttack(Progression.MoveFor(MoveSlot.Heavy));
             else if (Input.SpecialPressed) TryLearnedMove(MoveSlot.Special);
             else if (Input.SuperPressed) TryLearnedMove(MoveSlot.Super);
+            else TickAttackBuffer();
+        }
+
+        /// <summary>
+        /// Starts a move now if the body is free (or the current move can be cancelled into it); otherwise
+        /// remembers it for <see cref="AttackBufferWindow"/> seconds. The newest press replaces an older one.
+        /// Returns true if it started straight away.
+        /// </summary>
+        public bool RequestAttack(FightingMove move)
+        {
+            if (move == null) return false;
+            if (Attack.TryAttack(move))
+            {
+                bufferedMove = null;
+                return true;
+            }
+            bufferedMove = move;
+            bufferedAt = Time.time;
+            return false;
+        }
+
+        /// <summary>The buffered press waiting to fire (null if none, or if it has expired).</summary>
+        public FightingMove BufferedAttack => bufferedMove != null && Time.time - bufferedAt <= AttackBufferWindow ? bufferedMove : null;
+
+        /// <summary>Fires a buffered press as soon as it can; drops it once it's older than the window.</summary>
+        public void TickAttackBuffer()
+        {
+            if (bufferedMove == null) return;
+            if (Time.time - bufferedAt > AttackBufferWindow) bufferedMove = null;
+            else if (Attack.TryAttack(bufferedMove)) bufferedMove = null;
         }
 
         bool EnemyNearby(float range)
@@ -197,7 +247,7 @@ namespace NineToFight.Player
                 GameFlow.Instance?.Toast($"{move.displayName} unlocks at {CareerLadder.RankTitle(move.unlockLevel)} (Lv {move.unlockLevel})");
                 return;
             }
-            Attack.TryAttack(move);
+            RequestAttack(move);
         }
 
         void TryLearnedMove(MoveSlot slot)
@@ -211,7 +261,7 @@ namespace NineToFight.Player
                     : "You haven't learned that yet.");
                 return;
             }
-            Attack.TryAttack(move);
+            RequestAttack(move);
         }
 
         void Dodge()
@@ -221,22 +271,24 @@ namespace NineToFight.Player
                 ? inputDirection
                 : Motor.FacingDirection;
             Attack.Interrupt();
+            bufferedMove = null;
             Motor.Dash(direction, dodgeSpeed, dodgeDuration);
             Health.MakeInvulnerable(dodgeInvulnerability);
             if (Visual != null) Visual.Flash(new Color(0.75f, 0.9f, 1f), dodgeDuration);
-            nextDodgeTime = Time.time + dodgeCooldown * Perks.DodgeCooldownMultiplier;
+            nextDodgeTime = Time.time + DodgeCooldown;
             Dodged?.Invoke();
         }
 
         void OnDamaged(DamageInfo info)
         {
             Attack.Interrupt();
+            bufferedMove = null;
             Motor.AddImpulse(info.knockback);
             stunnedUntil = Time.time + hitStun;
             if (Visual != null)
             {
                 Visual.Flash(new Color(1f, 0.45f, 0.4f), 0.1f);
-                Visual.PlayHitReaction(info.knockback);
+                Visual.PlayHitReaction(info.knockback, hitStun);
             }
             GameFlow.HitStop(info.hitStop);
             SideScrollCamera.Shake(0.25f, 0.18f);

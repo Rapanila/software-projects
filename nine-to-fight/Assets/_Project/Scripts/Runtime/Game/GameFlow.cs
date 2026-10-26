@@ -25,6 +25,9 @@ namespace NineToFight.Game
         public static GameFlow Instance { get; private set; }
         public static bool IsPlaying => Instance != null &&
             (Instance.State == GameState.Playing || Instance.State == GameState.FloorCleared);
+        /// <summary>The pause menu (or the options opened from it) is up: gameplay input is ignored.</summary>
+        public static bool IsPaused => Instance != null && (Instance.State == GameState.Paused ||
+            (Instance.State == GameState.Options && Instance.stateBeforeOptions == GameState.Paused));
 
         const string BestFloorKey = "NineToFight.BestFloor";
         const string ChampionKey = "NineToFight.BecameCeo";
@@ -47,6 +50,7 @@ namespace NineToFight.Game
 
         int selectedClass;
         bool hitStopping, riding;
+        float timeEffectUntil;
         Coroutine timeRoutine;
         GameState stateBeforePause, stateBeforeOptions;
         TowerDirector director;
@@ -60,16 +64,19 @@ namespace NineToFight.Game
         float drillEndsAt;
 
         public FloorEvent CurrentEvent { get; private set; }
+        /// <summary>The fight fence: shut while coworkers are engaged (see <see cref="ArenaLock"/>).</summary>
+        public ArenaLock Arena { get; } = new ArenaLock();
         /// <summary>Fire Drill: seconds left before the elevator locks (0 when not running).</summary>
         public float DrillTimeLeft => CurrentEvent == FloorEvent.FireDrill && drillEndsAt > 0f ? Mathf.Max(0f, drillEndsAt - Time.time) : 0f;
         public IReadOnlyList<Perk> PerkOffer => perkOffer;
+        /// <summary>Tests: guarantees this perk is in the next elevator offer (cleared once used), like TowerDirector.ForceEvent.</summary>
+        public static PerkId? ForcePerk;
 
         public GameState State { get; private set; }
         public float ShiftStartTime { get; private set; }
         public float RunStartTime { get; private set; }
         public int Floor => floorNumber;
         public string FloorName => floorNumber == 1 ? floorName : TowerPlan.FloorName(floorNumber);
-        public string FloorLabel => $"Floor {floorNumber} of {TowerPlan.FloorCount}: {FloorName}";
         public PlayerController Player => player;
         public PlayerClass[] PlayerClasses => playerClasses;
         public ComboTracker Combo { get; } = new ComboTracker();
@@ -174,13 +181,13 @@ namespace NineToFight.Game
             {
                 case GameState.Title:
                     hud.TitleMenu.Move(input.NavigateY);
-                    if (input.SubmitPressed) hud.TitleMenu.Choose();
+                    if (input.ConfirmPressed) hud.TitleMenu.Choose();
                     break;
 
                 case GameState.ClassSelect:
                     int nav = input.NavigateX;
                     if (nav != 0) SelectClass((selectedClass + nav + playerClasses.Length) % playerClasses.Length);
-                    if (input.SubmitPressed) ConfirmClass();
+                    if (input.ConfirmPressed) ConfirmClass();
                     else if (input.CancelPressed)
                     {
                         GameAudio.Play(Sfx.UiBack, 0.6f, 0f);
@@ -194,13 +201,14 @@ namespace NineToFight.Game
                     else
                     {
                         TrackBoss();
+                        UpdateArena();
                         TrackFireDrill();
                     }
                     break;
 
                 case GameState.Paused:
                     hud.PauseMenu.Move(input.NavigateY);
-                    if (input.RestartPressed) Restart();
+                    if (input.RestartPressed) ConfirmRestart();
                     else if (input.SubmitPressed) hud.PauseMenu.Choose();
                     else if (input.PausePressed || input.CancelPressed) Resume();
                     break;
@@ -214,7 +222,8 @@ namespace NineToFight.Game
                     break;
 
                 case GameState.GameOver:
-                    if (input.RestartPressed || input.SubmitPressed) Restart();
+                    // Only once the termination letter is up, so a button mashed through the death doesn't skip it.
+                    if (gameOverShown && (input.RestartPressed || input.ConfirmPressed)) Restart();
                     break;
 
                 case GameState.Ending:
@@ -224,8 +233,8 @@ namespace NineToFight.Game
                         int pick = input.NavigateX;
                         if (pick != 0) SelectPerk((perkChoice + pick + perkOffer.Count) % perkOffer.Count);
                     }
-                    if (input.RestartPressed) Restart();
-                    else if (input.SubmitPressed) ConfirmEnding();
+                    if (input.RestartPressed) ConfirmRestart();
+                    else if (input.ConfirmPressed) ConfirmEnding();
                     break;
             }
         }
@@ -258,7 +267,7 @@ namespace NineToFight.Game
         {
             if (State != GameState.Options) return;
             if (index >= GameSettings.All.Count) CloseOptions();
-            else StepSetting(1);
+            else CycleSetting(index);
         }
 
         void StepSetting(int direction)
@@ -266,6 +275,17 @@ namespace NineToFight.Game
             int index = hud.OptionsMenu.Selected;
             if (index >= GameSettings.All.Count) return;
             GameSettings.Step(GameSettings.All[index], direction);
+            hud.RefreshOptions();
+            GameAudio.Play(Sfx.UiMove, 0.6f, 0f);
+        }
+
+        /// <summary>A click on a setting raises it and wraps round from the top, so mouse players can lower it too.</summary>
+        void CycleSetting(int index)
+        {
+            var id = GameSettings.All[index];
+            int before = GameSettings.Get(id);
+            GameSettings.Step(id, 1);
+            if (GameSettings.Get(id) == before) GameSettings.Step(id, -before); // at the top: wrap to the bottom
             hud.RefreshOptions();
             GameAudio.Play(Sfx.UiMove, 0.6f, 0f);
         }
@@ -559,7 +579,7 @@ namespace NineToFight.Game
             int baseXp = enemy.WorkerClass != null ? enemy.WorkerClass.xpReward : 10;
             int xp = Mathf.RoundToInt(baseXp * bonus * player.Perks.XpMultiplier);
             player.Progression.AddXp(xp);
-            string combo = bonus > 1.01f ? $" (combo x{bonus:0.0})" : "";
+            string combo = bonus > 1.01f ? " (combo x" + bonus.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + ")" : "";
             Toast($"{enemy.DisplayName} clocked out. +{xp} XP{combo}");
 
             if (enemy.Boss != BossRank.None)
@@ -635,6 +655,7 @@ namespace NineToFight.Game
                 "Please return your badge and stapler to reception on your way out.");
             yield return new WaitForSecondsRealtime(1.2f);
             hud.ShowScreen(GameState.GameOver);
+            gameOverShown = true;
         }
 
         public void OnElevatorReached()
@@ -642,6 +663,8 @@ namespace NineToFight.Game
             // Normally the floor must be cleared; during a fire drill the open elevator is the point.
             bool drillExit = State == GameState.Playing && DrillTimeLeft > 0f;
             if (State != GameState.FloorCleared && !drillExit) return;
+            // Running for it skips everyone still on the floor (and their XP); HR only hands out benefits for a cleared floor.
+            bool skipped = drillExit && EnemyBrain.Active.Count > 0;
             if (drillExit)
             {
                 drillEndsAt = 0f;
@@ -664,10 +687,16 @@ namespace NineToFight.Game
             }
             else
             {
-                perkOffer = PerkLibrary.Roll(runRng, 3, player.Perks);
+                perkOffer = skipped ? new List<Perk>() : PerkLibrary.Roll(runRng, 3, player.Perks);
+                if (!skipped && ForcePerk.HasValue && perkOffer.Count > 0 && !perkOffer.Exists(p => p.id == ForcePerk.Value))
+                    perkOffer[0] = PerkLibrary.Get(ForcePerk.Value);
+                ForcePerk = null;
                 perkChoice = 0;
+                string benefits = skipped
+                    ? "You skipped the floor, so no benefits package this time."
+                    : "HR has a benefits package for you. Pick one.";
                 hud.SetEndingText(drillExit ? "Made it out" : "Going up",
-                    $"{stats}\n{(floorNumber == 1 ? nextFloorTeaser : TowerPlan.NextFloorTeaser(floorNumber))}\n\nHR has a benefits package for you. Pick one.",
+                    $"{stats}\n{(floorNumber == 1 ? nextFloorTeaser : TowerPlan.NextFloorTeaser(floorNumber))}\n\n{benefits}",
                     perkOffer.Count > 0
                         ? $"A D|Choose a benefit;Enter|Take it and ride up;R|Start over"
                         : $"Enter|Ride up to floor {floorNumber + 1};R|Start over");
@@ -679,6 +708,33 @@ namespace NineToFight.Game
         }
 
         static string Plural(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+
+        // ------------------------------------------------------------------ arena
+
+        /// <summary>Fences the player and the camera in while coworkers are engaged; opens up when they're down.</summary>
+        void UpdateArena()
+        {
+            var cam = SideScrollCamera.Main;
+            Arena.BeginFrame();
+            foreach (var enemy in EnemyBrain.Active)
+                if (enemy.IsAggro && !enemy.Health.IsDead) Arena.AddEngaged(enemy.transform.position.x);
+            // Fire drills are a race for the elevator; nothing may wall the player in.
+            bool allowed = State == GameState.Playing && CurrentEvent != FloorEvent.FireDrill && !riding;
+            float levelMin = cam != null ? cam.LevelMinX - 1f : float.NegativeInfinity;
+            float levelMax = cam != null ? cam.LevelMaxX + 1f : float.PositiveInfinity;
+            Arena.EndFrame(player.transform.position.x, allowed, levelMin, levelMax);
+            if (Arena.Locked)
+            {
+                player.Motor.SetArena(Arena.Min, Arena.Max);
+                // Keep the arena's edges in frame: the camera centre stays a little inside the walls.
+                if (cam != null) cam.SetBounds(Arena.Min + 4f, Arena.Max - 4f);
+            }
+            else
+            {
+                player.Motor.ClearArena();
+                if (cam != null) cam.ResetBounds();
+            }
+        }
 
         // ------------------------------------------------------------------ pause
 
@@ -702,6 +758,7 @@ namespace NineToFight.Game
         void Resume()
         {
             State = stateBeforePause;
+            if (timeRoutine != null) StopCoroutine(timeRoutine);
             Time.timeScale = 1f;
             hitStopping = false;
             hud.ShowScreen(State);
@@ -714,18 +771,43 @@ namespace NineToFight.Game
             if (hud != null) hud.Toast(message);
         }
 
+        /// <summary>Seconds a first R press stays armed; a second press inside it abandons the run.</summary>
+        public const float RestartConfirmWindow = 2f;
+        float restartArmedUntil = -1f;
+        bool gameOverShown;
+
+        /// <summary>R mid-run asks first: the second press within <see cref="RestartConfirmWindow"/> s starts over.</summary>
+        void ConfirmRestart()
+        {
+            if (Time.unscaledTime <= restartArmedUntil)
+            {
+                Restart();
+                return;
+            }
+            restartArmedUntil = Time.unscaledTime + RestartConfirmWindow;
+            Toast("Press R again to quit this career and start over.");
+            GameAudio.Play(Sfx.UiMove, 0.6f, 0f);
+        }
+
         void Restart()
         {
             Time.timeScale = 1f;
+            // GameAudio outlives the scene: don't carry the pause menu's muffled music into the new run.
+            GameAudio.SetMusicDucked(false);
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
         // ------------------------------------------------------------------ time effects
 
-        /// <summary>Freeze-frame on impact; makes hits feel heavy.</summary>
+        /// <summary>Freeze-frame on impact; makes hits feel heavy. Overlapping requests keep the longest.</summary>
         public static void HitStop(float duration)
         {
-            if (Instance == null || duration <= 0f || Instance.hitStopping) return;
+            if (Instance == null || duration <= 0f) return;
+            if (Instance.hitStopping)
+            {
+                Instance.timeEffectUntil = Mathf.Max(Instance.timeEffectUntil, Time.unscaledTime + duration);
+                return;
+            }
             Instance.timeRoutine = Instance.StartCoroutine(Instance.TimeScaleRoutine(duration, 0.05f));
         }
 
@@ -741,8 +823,9 @@ namespace NineToFight.Game
         IEnumerator TimeScaleRoutine(float duration, float scale)
         {
             hitStopping = true;
+            timeEffectUntil = Time.unscaledTime + duration;
             if (State != GameState.Paused && State != GameState.Options) Time.timeScale = scale;
-            yield return new WaitForSecondsRealtime(duration);
+            while (Time.unscaledTime < timeEffectUntil) yield return null;
             if (State != GameState.Paused && State != GameState.Options) Time.timeScale = 1f;
             hitStopping = false;
         }

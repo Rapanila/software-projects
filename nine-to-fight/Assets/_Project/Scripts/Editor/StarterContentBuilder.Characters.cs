@@ -59,12 +59,14 @@ namespace NineToFight.EditorTools
                 case "Man_Suit/Body/Suit":
                 case "Man_Casual/Body/LightBrown":
                 case "Man_Hoodie/Body/Purple":
-                case "Woman_Suit/Body/Black":
+                // The suit's blouse takes the department colour; the blazer (like the men's tie) takes the accent.
+                case "Woman_Suit/Body/White":
                 case "Woman_Blouse/Body/White":
                 case "Woman_Dress/Body/LimeGreen":
                 case "Woman_Dress/Legs/LimeGreen":
                     return Tint.Garment;
                 case "Man_Suit/Body/Tie":
+                case "Woman_Suit/Body/Black":
                 case "Man_Casual/Feet/Red_Dark":
                 case "Man_Hoodie/Feet/Purple":
                 case "Woman_Dress/Body/Gold":
@@ -94,10 +96,11 @@ namespace NineToFight.EditorTools
             public readonly List<GameObject> heads = new List<GameObject>();
             public readonly List<CharacterLook.Outfit> outfits = new List<CharacterLook.Outfit>();
             public Vector3 grip;
-            public Quaternion gripRotation, punchRotation;
+            public Quaternion gripRotation;
             public Vector3 headForward;
             public Animator animator;
             public Transform[] fingers;
+            public Quaternion[] fingerOpen;
             public Quaternion[] fist;
         }
 
@@ -153,6 +156,7 @@ namespace NineToFight.EditorTools
             frontArm.position = b["UpperArm.R"].position;
             frontElbow.position = b["LowerArm.R"].position;
             socket.position = b["Wrist.R"].TransformPoint(figures[0].grip);
+            socket.rotation = b["Wrist.R"].rotation * figures[0].gripRotation;
             backArm.position = b["UpperArm.L"].position;
             backElbow.position = b["LowerArm.L"].position;
             legLeft.position = b["UpperLeg.L"].position;
@@ -185,9 +189,9 @@ namespace NineToFight.EditorTools
                 hand = f.bones["Wrist.R"],
                 grip = f.grip,
                 gripRotation = f.gripRotation,
-                punchRotation = f.punchRotation,
                 animator = f.animator,
                 fingers = f.fingers,
+                fingerOpen = f.fingerOpen,
                 fist = f.fist,
                 chest = f.bones["Chest"],
                 headForward = f.headForward,
@@ -208,19 +212,7 @@ namespace NineToFight.EditorTools
 
             var cv = visual.gameObject.AddComponent<CharacterVisual>();
             Wire(cv, "model", model);
-            Wire(cv, "chest", chest);
-            Wire(cv, "attackArm", frontArm);
-            Wire(cv, "backArm", backArm);
-            Wire(cv, "elbowFront", frontElbow);
-            Wire(cv, "elbowBack", backElbow);
             Wire(cv, "wrist", socket);
-            Wire(cv, "legLeft", legLeft);
-            Wire(cv, "legRight", legRight);
-            Wire(cv, "kneeLeft", kneeLeft);
-            Wire(cv, "kneeRight", kneeRight);
-            Wire(cv, "ankleLeft", ankleLeft);
-            Wire(cv, "ankleRight", ankleRight);
-            Wire(cv, "head", head);
             SetArray(cv, "shirtRenderers", garments.ToArray());
             SetArray(cv, "accentRenderers", accents.ToArray());
             Wire(cv, "animationSet", fightAnimations);
@@ -261,25 +253,30 @@ namespace NineToFight.EditorTools
 
             PoseAtRest(figure, bones);
 
-            // Closed fists (held on top of every clip) and the grip: the centre of the curled fingers, with
-            // the item running across the palm, its business end out past the thumb.
+            // Closed fists (held on top of every clip) and the grip: the hole the fist closes around, with the
+            // item running across the palm and out past the little finger.
             var fingerBones = new List<Transform>();
             foreach (var side in new[] { "L", "R" })
                 foreach (var finger in new[] { "Thumb1", "Thumb2", "Thumb3", "Index2", "Index3", "Index4", "Middle2", "Middle3",
                              "Middle4", "Ring2", "Ring3", "Ring4", "Pinky2", "Pinky3", "Pinky4" })
                     fingerBones.Add(bones[$"{finger}.{side}"]);
             built.fingers = fingerBones.ToArray();
+            var neutral = avatar.humanDescription.skeleton.ToDictionary(b => b.name, b => b.rotation);
+            built.fingerOpen = fingerBones.Select(f => neutral[f.name]).ToArray();
             built.fist = fingerBones.Select(f => f.localRotation).ToArray();
             var hand = bones["Wrist.R"];
-            var curled = new[] { "Index", "Middle", "Ring", "Pinky" }.SelectMany(f => new[] { 2, 3, 4 }.Select(i => bones[$"{f}{i}.R"].position)).ToList();
-            var center = curled.Aggregate(Vector3.zero, (a, b) => a + b) / curled.Count;
+            Vector3 Joint(int i) => new[] { "Index", "Middle", "Ring", "Pinky" }.Aggregate(Vector3.zero, (a, f) => a + bones[$"{f}{i}.R"].position) / 4f;
+            Vector3 knuckle = Joint(2), middle = Joint(3), tip = Joint(4);
+            // The curled fingers hook back toward the wrist: the hole lies between them and the palm, well under
+            // the first finger joints, level with the last finger bones.
+            var center = (knuckle + tip) * 0.5f + (tip - middle) * 0.77f;
             var towardPinky = (bones["Pinky2.R"].position - bones["Index2.R"].position).normalized;
             var knuckles = Vector3.ProjectOnPlane(bones["Middle2.R"].position - hand.position, towardPinky).normalized;
             built.grip = hand.InverseTransformPoint(center);
-            built.gripRotation = Quaternion.Inverse(hand.rotation) * Quaternion.LookRotation(knuckles, towardPinky);
+            built.gripRotation = Quaternion.Inverse(hand.rotation) * Quaternion.LookRotation(knuckles, -towardPinky);
             built.headForward = Quaternion.Inverse(bones["Head"].rotation) * figure.forward;
-            // Punch grip: the item's business end straight out the front of the fist.
-            built.punchRotation = Quaternion.Inverse(hand.rotation) * Quaternion.LookRotation(-towardPinky, -knuckles);
+            // Use this same grip through attacks: the wrist animation supplies the swing, without
+            // turning the item around inside the closed hand or lifting a carried item into the face.
 
             foreach (var file in spec.heads)
             {

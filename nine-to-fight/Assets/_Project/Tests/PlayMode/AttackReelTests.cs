@@ -22,7 +22,7 @@ namespace NineToFight.Tests
     {
         static readonly string Dir = Path.GetFullPath("Builds/Screenshots/AttackReel");
 
-        [UnityTest]
+        [UnityTest, Category(FilmCategory.Name)]
         public IEnumerator FilmEveryAttackStyle()
         {
             Directory.CreateDirectory(Dir);
@@ -72,7 +72,7 @@ namespace NineToFight.Tests
         }
 
         /// <summary>Films every flurry as a combo: each hit its own strike, flowing on from the last.</summary>
-        [UnityTest]
+        [UnityTest, Category(FilmCategory.Name)]
         public IEnumerator FilmTheCombos()
         {
             string dir = Path.GetFullPath("Builds/Screenshots/ComboReel");
@@ -134,7 +134,7 @@ namespace NineToFight.Tests
         /// Films the fighting stance: the guard idling, every fidget, the block going up and taking a hit,
         /// from the side and from a three-quarter view. Every other frame at 30 fps.
         /// </summary>
-        [UnityTest]
+        [UnityTest, Category(FilmCategory.Name)]
         public IEnumerator FilmTheStance()
         {
             string dir = Path.GetFullPath("Builds/Screenshots/StanceReel");
@@ -188,9 +188,6 @@ namespace NineToFight.Tests
                     visual.Blocking = false;
                     yield return new WaitForSeconds(0.6f);
                     yield return Film($"{view}_idle", 72);
-                    foreach (FightStance.Fidget fidget in System.Enum.GetValues(typeof(FightStance.Fidget)))
-                        if (fidget != FightStance.Fidget.None)
-                            yield return Film($"{view}_fidget_{fidget}", 36, () => visual.PlayFidget(fidget));
                     yield return Film($"{view}_block_up", 24, () => visual.Blocking = true);
                     yield return Film($"{view}_block_hit", 24, () => visual.PlayBlockReaction(Vector3.left * 4f));
                     yield return Film($"{view}_block_down", 24, () => visual.Blocking = false);

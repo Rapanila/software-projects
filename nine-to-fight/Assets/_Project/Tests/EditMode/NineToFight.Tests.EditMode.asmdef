@@ -3,6 +3,7 @@
     "rootNamespace": "NineToFight.Tests",
     "references": [
         "NineToFight.Runtime",
+        "NineToFight.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

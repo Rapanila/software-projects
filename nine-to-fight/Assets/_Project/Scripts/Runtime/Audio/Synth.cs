@@ -16,8 +16,12 @@ namespace NineToFight.Audio
 
         static float[] Buffer(float seconds) => new float[Mathf.CeilToInt(seconds * SampleRate)];
 
-        public static AudioClip ToClip(string name, float[] samples, bool normalize = true, float peak = 0.9f)
+        public static AudioClip ToClip(string name, float[] samples, bool normalize = true, float peak = 0.9f, bool fadeOut = true)
         {
+            // One-shots end in silence however their last segment was shaped (loops keep their seam).
+            if (fadeOut)
+                for (int i = 0; i < ReleaseSamples && i < samples.Length; i++)
+                    samples[samples.Length - 1 - i] *= i / (float)ReleaseSamples;
             if (normalize)
             {
                 float max = 0.0001f;
@@ -29,6 +33,13 @@ namespace NineToFight.Audio
             clip.SetData(samples, 0);
             return clip;
         }
+
+        /// <summary>Every tone and noise burst fades out over its last few milliseconds, so a cut-off never clicks.</summary>
+        public const float ReleaseSeconds = 0.008f;
+        static readonly int ReleaseSamples = Mathf.CeilToInt(ReleaseSeconds * SampleRate);
+
+        /// <summary>1 inside a segment, ramping to 0 over its last <see cref="ReleaseSeconds"/>.</summary>
+        static float Release(int index, int count) => Mathf.Clamp01((count - index) / (float)ReleaseSamples);
 
         /// <summary>Attack/decay envelope: quick rise then exponential fall.</summary>
         static float Env(float t, float attack, float decay) =>
@@ -46,7 +57,7 @@ namespace NineToFight.Audio
                 float t = i / (float)SampleRate;
                 float f = Mathf.Lerp(f0, f1, t / length);
                 phase += f / SampleRate;
-                buf[from + i] += wave(phase) * amp * Env(t, attack, decay);
+                buf[from + i] += wave(phase) * amp * Env(t, attack, decay) * Release(i, count);
             }
         }
 
@@ -63,7 +74,7 @@ namespace NineToFight.Audio
                 float cutoff = Mathf.Lerp(cutoff0, cutoff1, t / length);
                 float a = 1f - Mathf.Exp(-TwoPi * cutoff / SampleRate);
                 lp += a * ((float)rng.NextDouble() * 2f - 1f - lp);
-                buf[from + i] += lp * amp * Env(t, attack, decay);
+                buf[from + i] += lp * amp * Env(t, attack, decay) * Release(i, count);
             }
         }
 
@@ -223,7 +234,7 @@ namespace NineToFight.Audio
                 b[i] *= k;
                 b[b.Length - 1 - i] *= k;
             }
-            return ToClip("Office_Ambience", b, normalize: true, peak: 0.6f);
+            return ToClip("Office_Ambience", b, normalize: true, peak: 0.6f, fadeOut: false);
         }
 
         // ------------------------------------------------------------------ music
@@ -346,7 +357,7 @@ namespace NineToFight.Audio
 
             // Soft-clip so overlapping voices stay warm instead of harsh.
             for (int i = 0; i < b.Length; i++) b[i] = (float)Math.Tanh(b[i] * 1.2f);
-            return ToClip(track.name, b, normalize: true, peak: 0.8f);
+            return ToClip(track.name, b, normalize: true, peak: 0.8f, fadeOut: false);
         }
     }
 }

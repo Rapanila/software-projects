@@ -3,37 +3,9 @@ using UnityEngine;
 namespace NineToFight.Characters
 {
     /// <summary>
-    /// Damped spring on a float. Frequency is how fast it reacts (Hz); damping below 1 overshoots a little
-    /// and settles, which is what makes motion read as having weight instead of snapping.
-    /// </summary>
-    public struct Spring1
-    {
-        public float value, velocity;
-
-        public float Step(float target, float frequency, float damping, float dt)
-        {
-            float w = 2f * Mathf.PI * frequency;
-            // Sub-step so stiff springs stay stable on long frames.
-            int steps = Mathf.Clamp(Mathf.CeilToInt(w * dt / 0.4f), 1, 24);
-            float h = dt / steps;
-            for (int i = 0; i < steps; i++)
-            {
-                velocity += (w * w * (target - value) - 2f * damping * w * velocity) * h;
-                value += velocity * h;
-            }
-            return value;
-        }
-
-        public void Reset(float to)
-        {
-            value = to;
-            velocity = 0f;
-        }
-    }
-
-    /// <summary>
     /// Damped spring on a rotation, with angular velocity in the parent's frame so it can be
-    /// "kicked" (hit reactions, turns, landings) and wobble back.
+    /// "kicked" (hit reactions, impacts) and wobble back. Frequency is how fast it reacts (Hz); damping
+    /// below 1 overshoots a little and settles, so a jolt reads as having weight instead of snapping.
     /// </summary>
     public struct SpringRotation
     {

@@ -17,21 +17,33 @@ namespace NineToFight.Combat
         void OnDisable() => Live.Remove(this);
 
         Vector3 velocity;
-        float damage, knockback, dieAt;
+        float damage, knockback, dieAt, hitStop = 0.05f;
         Team team;
         GameObject source;
         Transform spinner;
+        bool pierce;
+        System.Action<Health, DamageInfo> onHit;
+        readonly System.Collections.Generic.HashSet<Health> struck = new System.Collections.Generic.HashSet<Health>();
 
         public Team Team => team;
+        public bool Pierces => pierce;
 
-        public static Projectile Launch(GameObject prefab, Vector3 position, Vector3 direction, float speed, float damage, Team team, GameObject source)
+        /// <summary>
+        /// Throws an item. <paramref name="pierce"/> lets it fly through everyone in its path (each hit once);
+        /// <paramref name="onHit"/> tells the thrower about every hit that lands (combos, healing).
+        /// </summary>
+        public static Projectile Launch(GameObject prefab, Vector3 position, Vector3 direction, float speed, float damage, Team team, GameObject source,
+            float knockback = 6f, float hitStop = 0.05f, bool pierce = false, System.Action<Health, DamageInfo> onHit = null)
         {
             var root = new GameObject("Projectile");
             root.transform.position = position;
             var p = root.AddComponent<Projectile>();
             p.velocity = direction.normalized * speed;
             p.damage = damage;
-            p.knockback = 6f;
+            p.knockback = knockback;
+            p.hitStop = hitStop;
+            p.pierce = pierce;
+            p.onHit = onHit;
             p.team = team;
             p.source = source;
             p.dieAt = Time.time + 2.2f;
@@ -61,6 +73,10 @@ namespace NineToFight.Combat
             velocity = -velocity * 1.3f;
             team = newTeam;
             source = newSource;
+            // It belongs to the side that swatted it now: it stops at the first body and reports to nobody.
+            pierce = false;
+            onHit = null;
+            struck.Clear();
             damage *= 1.5f;
             dieAt = Time.time + 2f;
             Reflected?.Invoke(this);
@@ -80,14 +96,21 @@ namespace NineToFight.Combat
             for (int i = 0; i < count; i++)
             {
                 var target = Buffer[i].GetComponentInParent<Health>();
-                if (target == null || target.Team == team || target.IsDead) continue;
-                bool hit = target.TakeDamage(new DamageInfo
+                if (target == null || target.Team == team || target.IsDead || struck.Contains(target)) continue;
+                var info = new DamageInfo
                 {
                     amount = damage,
                     knockback = new Vector3(Mathf.Sign(velocity.x), 0f, 0f) * knockback + Vector3.up * 2f,
                     source = source,
-                    hitStop = 0.05f,
-                });
+                    hitStop = hitStop,
+                };
+                bool hit = target.TakeDamage(info);
+                if (hit) onHit?.Invoke(target, info);
+                if (pierce)
+                {
+                    struck.Add(target);
+                    continue;
+                }
                 // Invulnerable dodgers pass straight through; anything else stops it.
                 if (hit || !target.IsInvulnerable)
                 {

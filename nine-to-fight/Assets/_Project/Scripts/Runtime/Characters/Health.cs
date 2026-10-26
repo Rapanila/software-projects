@@ -45,7 +45,6 @@ namespace NineToFight.Core
 
         /// <summary>Raised for every hit on anyone; feeds global effects (sound, sparks, combo).</summary>
         public static event Action<Health, DamageInfo> AnyDamaged;
-        public static event Action<Health> AnyDied;
 
         void Awake() => EnsureInit();
 
@@ -77,7 +76,6 @@ namespace NineToFight.Core
             {
                 IsDead = true;
                 Died?.Invoke();
-                AnyDied?.Invoke(this);
             }
             return true;
         }

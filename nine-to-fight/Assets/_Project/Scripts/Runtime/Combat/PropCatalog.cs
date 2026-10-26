@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using NineToFight.Characters;
 using UnityEngine;
 
 namespace NineToFight.Combat
@@ -13,8 +14,10 @@ namespace NineToFight.Combat
         {
             public string id;
             public string displayName;
-            [Tooltip("Grip at the origin; the item extends along local -Y (away from the shoulder).")]
+            [Tooltip("Unposed item geometry. Each body has its own fitted holding transform below.")]
             public GameObject prefab;
+            public ItemHoldPose manGrip;
+            public ItemHoldPose womanGrip;
         }
 
         [SerializeField] List<Entry> entries = new List<Entry>();
@@ -36,5 +39,12 @@ namespace NineToFight.Combat
         }
 
         public bool Contains(string id) => Get(id) != null;
+
+        public ItemHoldPose GetGrip(string id, int body)
+        {
+            foreach (var entry in entries)
+                if (entry.id == id) return body == 1 ? entry.womanGrip : entry.manGrip;
+            return null;
+        }
     }
 }

@@ -35,7 +35,6 @@ namespace NineToFight.Combat
         [Tooltip("Arm folded, the elbow whips across at head height.")] Elbow,
         [Tooltip("Crouch, launch, and spear the rear leg out in mid-air.")] FlyingKick,
         [Tooltip("Leap, lie back in the air and plant both feet in them.")] Dropkick,
-        [Tooltip("Hop off the rear leg, kick it back and fly in behind a straight punch.")] SupermanPunch,
     }
 
     /// <summary>Frame data and hit properties for one attack.</summary>
@@ -75,6 +74,14 @@ namespace NineToFight.Combat
         public float recovery = 0.2f;
         public float cooldown;
 
+        [Header("Thrown")]
+        [Tooltip("Above zero, the item is thrown at this speed (m/s) instead of swung: one projectile per hit.")]
+        public float throwSpeed;
+        [Tooltip("Thrown items fly through everyone in their path instead of stopping at the first.")]
+        public bool pierce;
+
+        public bool IsThrown => throwSpeed > 0f;
+
         [Header("Movement")]
         [Tooltip("Forward impulse applied when the move becomes active.")]
         public float lunge;
@@ -82,6 +89,9 @@ namespace NineToFight.Combat
         public float moveMultiplier = 0.15f;
 
         public float TotalDuration => (startup + active + recovery) * Mathf.Max(1, hits);
+
+        /// <summary>When a strike lands, in seconds after it starts: the middle of its hit window.</summary>
+        public static float ImpactTime(float startup, float active) => startup + active * 0.5f;
 
         /// <summary>The strike thrown on a given hit of the move (0 = first).</summary>
         public AttackStyle StyleForHit(int hit) =>

@@ -8,17 +8,22 @@ namespace NineToFight.Game
 {
     /// <summary>
     /// First-floor onboarding: one control prompt at a time, shown when it's relevant and dismissed
-    /// once the player has done it. Can be switched off under Options > Tutorial hints.
+    /// once the player has done it. Runs until it has been finished once (remembered in PlayerPrefs);
+    /// can be switched off under Options > Tutorial hints.
     /// </summary>
     public class Tutorial : MonoBehaviour
     {
         enum Step { Move, Attack, Dodge, Guard, Ability, Done }
 
+        /// <summary>PlayerPrefs flag set once the whole tutorial has been seen.</summary>
+        public const string CompletedKey = "NineToFight.TutorialDone";
+        public static bool Completed => PlayerPrefs.GetInt(CompletedKey, 0) == 1;
+
         GameFlow flow;
         GameHud hud;
         PlayerController player;
         Step step = Step.Move;
-        bool showing, wasHit, sawBlock, landedHit, gotKnockout;
+        bool showing, wasHit, sawBlock, landedHit, gotKnockout, dodged;
         float shownAt, startX;
 
         void Start()
@@ -26,12 +31,13 @@ namespace NineToFight.Game
             flow = GetComponent<GameFlow>();
             hud = FindAnyObjectByType<GameHud>();
             player = flow != null ? flow.Player : null;
-            if (player == null || hud == null)
+            if (player == null || hud == null || Completed)
             {
                 enabled = false;
                 return;
             }
             player.Health.Damaged += _ => wasHit = true;
+            player.Dodged += () => dodged = true;
             Health.AnyDamaged += OnAnyDamaged;
             EnemyBrain.Callout += OnCallout;
             EnemyBrain.AnyDefeated += OnDefeated;
@@ -77,8 +83,9 @@ namespace NineToFight.Game
                     else if (showing && landedHit && shown > 1.2f) Advance();
                     break;
                 case Step.Dodge:
-                    if (!showing && wasHit) Show("Shift|Dodge through their attacks");
-                    else if (showing && shown > 4f) Advance();
+                    // Teach it as an attack comes in (or right after the first hit), and finish once they've dodged.
+                    if (!showing && (wasHit || EnemyWindingUp(5f))) { dodged = false; Show("Shift|Dodge through their attacks"); }
+                    else if (showing && ((dodged && shown > 0.6f) || shown > 6f)) Advance();
                     break;
                 case Step.Guard:
                     if (!showing && sawBlock) Show("2 K|Heavy hits break an Accountant's guard");
@@ -90,6 +97,13 @@ namespace NineToFight.Game
                     else if (showing && (shown > 5f || (player.Ability != null && player.Ability.IsActive))) Advance();
                     break;
             }
+        }
+
+        bool EnemyWindingUp(float range)
+        {
+            foreach (var e in EnemyBrain.Active)
+                if (e.Attack.IsAttacking && Mathf.Abs(e.transform.position.x - player.transform.position.x) < range) return true;
+            return false;
         }
 
         bool EnemyNear(float range)
@@ -117,7 +131,12 @@ namespace NineToFight.Game
         {
             Hide();
             step++;
-            if (step >= Step.Done) enabled = false;
+            if (step >= Step.Done)
+            {
+                enabled = false;
+                PlayerPrefs.SetInt(CompletedKey, 1);
+                PlayerPrefs.Save();
+            }
         }
     }
 }

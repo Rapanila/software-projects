@@ -33,7 +33,7 @@ namespace NineToFight.Tests
             cc.enabled = true;
         }
 
-        [UnityTest]
+        [UnityTest, Category(FilmCategory.Name)]
         public IEnumerator EndsPostersAndShowcase()
         {
             Directory.CreateDirectory(Dir);

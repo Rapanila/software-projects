@@ -51,6 +51,7 @@ namespace NineToFight.CameraRig
         void Awake()
         {
             Main = this;
+            CaptureBounds();
             SetTarget(target);
             Snap();
         }
@@ -66,11 +67,38 @@ namespace NineToFight.CameraRig
             targetMotor = target != null ? target.GetComponent<CharacterMotor2_5D>() : null;
         }
 
+        float levelMinX, levelMaxX;
+        bool boundsCaptured;
+
+        /// <summary>The floor's own camera bounds (as authored in the scene).</summary>
+        public float LevelMinX { get { CaptureBounds(); return levelMinX; } }
+        public float LevelMaxX { get { CaptureBounds(); return levelMaxX; } }
+
+        void CaptureBounds()
+        {
+            if (boundsCaptured) return;
+            boundsCaptured = true;
+            levelMinX = minX;
+            levelMaxX = maxX;
+        }
+
+        /// <summary>Narrows the camera to a span (an arena lock); <see cref="ResetBounds"/> restores the floor's own.</summary>
         public void SetBounds(float min, float max)
         {
+            CaptureBounds();
             minX = min;
-            maxX = max;
+            maxX = Mathf.Max(min, max);
         }
+
+        public void ResetBounds()
+        {
+            CaptureBounds();
+            minX = levelMinX;
+            maxX = levelMaxX;
+        }
+
+        public float MinX => minX;
+        public float MaxX => maxX;
 
         public static void SetShot(CameraShot value)
         {

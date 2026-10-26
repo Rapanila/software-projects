@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using NineToFight.Combat;
 using UnityEngine;
 
 namespace NineToFight.Game
@@ -16,10 +17,23 @@ namespace NineToFight.Game
         public string title;
         public string shirt, tie;
         public BossRank boss;
+        /// <summary>Optional office item this coworker fights with instead of the base class's (null keeps it).</summary>
+        public string prop;
+        public AttackStyle style;
 
         public Archetype(string baseId, string title, string shirt, string tie, BossRank boss = BossRank.None)
         {
             this.baseId = baseId; this.title = title; this.shirt = shirt; this.tie = tie; this.boss = boss;
+            prop = null; style = AttackStyle.Jab;
+        }
+
+        /// <summary>The same archetype fighting with its own item (and the motion that suits it).</summary>
+        public Archetype With(string item, AttackStyle motion)
+        {
+            var copy = this;
+            copy.prop = item;
+            copy.style = motion;
+            return copy;
         }
     }
 
@@ -47,6 +61,8 @@ namespace NineToFight.Game
         public readonly List<SpawnPoint> spawns = new List<SpawnPoint>();
         public readonly List<Vector3> coffee = new List<Vector3>();
         public readonly List<Vector3> reviews = new List<Vector3>();
+        /// <summary>Training seminars on this floor: where, and the move each one teaches.</summary>
+        public readonly List<(Vector3 position, string moveId)> seminars = new List<(Vector3 position, string moveId)>();
         public FloorEvent floorEvent;
         /// <summary>Chance a beaten coworker drops coffee.</summary>
         public float coffeeDropChance = 0.2f;
@@ -64,7 +80,6 @@ namespace NineToFight.Game
     public static class TowerPlan
     {
         public const int FloorCount = 9;
-        public const float StartX = 0f;
         public const float FirstEncounterX = 9f;
         public const float LastEncounterX = 46f;
         const float LaneDepth = 2.2f;
@@ -86,7 +101,7 @@ namespace NineToFight.Game
                 crew = new[]
                 {
                     new Archetype("Accountant", "Junior Accountant", "9DB89A", "2E5E3A"),
-                    new Archetype("Intern", "Audit Intern", "E8E4C9", "2E5E3A"),
+                    new Archetype("Intern", "Audit Intern", "E8E4C9", "2E5E3A").With("stapler", AttackStyle.Jab),
                     new Archetype("Accountant", "Auditor", "5E7D6A", "D4AF37"),
                 },
             },
@@ -115,9 +130,9 @@ namespace NineToFight.Game
                 name = "Sales Floor", tagline = "Always Be Clobbering.", light = "FFE6C4", carpet = "E0B07A",
                 crew = new[]
                 {
-                    new Archetype("HRRep", "Sales Rep", "E9A23B", "1D3557"),
-                    new Archetype("Intern", "Cold Caller", "F6D49A", "E9A23B"),
-                    new Archetype("ITSupport", "Closer", "1D3557", "E9A23B"),
+                    new Archetype("HRRep", "Sales Rep", "E9A23B", "1D3557").With("golf_club", AttackStyle.Golf),
+                    new Archetype("Intern", "Cold Caller", "F6D49A", "E9A23B").With("desk_phone", AttackStyle.Hook),
+                    new Archetype("ITSupport", "Closer", "1D3557", "E9A23B").With("smartphone", AttackStyle.Whip),
                 },
             },
             new FloorTheme
@@ -125,7 +140,7 @@ namespace NineToFight.Game
                 name = "Legal", tagline = "Objection! (Sustained, with a fist.)", light = "EDE6D8", carpet = "8C7E6A",
                 crew = new[]
                 {
-                    new Archetype("Accountant", "Paralegal", "3D405B", "B5838D"),
+                    new Archetype("Accountant", "Paralegal", "3D405B", "B5838D").With("briefcase", AttackStyle.Sweep),
                     new Archetype("HRRep", "Associate", "2F3E46", "CAD2C5"),
                 },
                 boss = new Archetype("MiddleManager", "Senior Counsel", "1B1B2F", "E0C097", BossRank.MiniBoss), hasBoss = true,
@@ -137,7 +152,7 @@ namespace NineToFight.Game
                 {
                     new Archetype("Intern", "Social Media Intern", "FF8FAB", "3A0CA3"),
                     new Archetype("ITSupport", "Growth Hacker", "7209B7", "F72585"),
-                    new Archetype("HRRep", "Brand Strategist", "4CC9F0", "3A0CA3"),
+                    new Archetype("HRRep", "Brand Strategist", "4CC9F0", "3A0CA3").With("megaphone", AttackStyle.Blast),
                 },
             },
             new FloorTheme
@@ -162,6 +177,18 @@ namespace NineToFight.Game
                 boss = new Archetype("MiddleManager", "THE CEO", "111111", "FFD60A", BossRank.FinalBoss), hasBoss = true,
             },
         };
+
+        /// <summary>The move a floor's training seminar teaches, or null if the floor has none (floor 1's is in the scene).</summary>
+        public static string SeminarMove(int floor)
+        {
+            switch (floor)
+            {
+                case 3: return MoveLibrary.KeyboardSmash.id;
+                case 5: return MoveLibrary.ReplyAll.id;
+                case 7: return MoveLibrary.KeyboardSmash.id;
+                default: return null;
+            }
+        }
 
         public static string FloorName(int floor) => Themes[Mathf.Clamp(floor, 1, FloorCount) - 1].name;
 
@@ -221,6 +248,10 @@ namespace NineToFight.Game
             }
             plan.reviews.Add(new Vector3((FirstEncounterX + LastEncounterX) / 2f, 0f, -1.8f));
             plan.coffee.Add(new Vector3(LastEncounterX + 4f, 0f, 0f));
+            // A training seminar on every other floor teaches a shared move early (or pays out XP if it's known).
+            string seminar = SeminarMove(floor);
+            if (seminar != null)
+                plan.seminars.Add((new Vector3(Mathf.Lerp(FirstEncounterX, LastEncounterX, 0.3f), 0f, 1.8f), seminar));
             return plan;
         }
 

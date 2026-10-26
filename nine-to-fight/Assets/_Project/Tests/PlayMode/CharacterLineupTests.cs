@@ -81,6 +81,21 @@ namespace NineToFight.Tests
                 Assert.Greater(hand.position.y, 0.9f, "guard up: fists at chest height");
             }
 
+            // The big items in every outfit's hand: sleeves (hoodie, dress) must not swallow the grip.
+            foreach (var item in new[] { "golf_club", "binder", "laptop", "keyboard", "briefcase" })
+            {
+                foreach (var e in line) e.HeldItem.SetIdleProp(item);
+                yield return new WaitForSecondsRealtime(0.5f);
+                foreach (var e in line)
+                {
+                    var hand = e.Visual.GetComponent<RigFollower>().Hand;
+                    var socket = e.transform.Find("Visual/Model/Chest/ArmPivot/Elbow/HandSocket");
+                    Assert.AreEqual(item, e.HeldItem.CurrentProp, e.name);
+                    Assert.Less(Vector3.Distance(hand.position, socket.position), 0.25f, $"{e.Visual.GetComponent<CharacterLook>().OutfitName} holds the {item}");
+                }
+                yield return Capture("lineup_" + item);
+            }
+
             // Close up on the first two: faces, fists and items.
             cam.transform.position = new Vector3(line[0].transform.position.x + 0.55f, 1.75f, -4.4f);
             cam.transform.rotation = Quaternion.LookRotation(new Vector3(line[0].transform.position.x + 0.55f, 1.45f, -2f) - cam.transform.position);

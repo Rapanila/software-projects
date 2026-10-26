@@ -24,10 +24,10 @@ namespace NineToFight.Characters
         enum Kind { None, Attack, Reaction, Knockout }
 
         const int RelaxedInput = 0, FightInput = 1, BlockInput = 2, WalkInput = 3, RunInput = 4, AirInput = 5;
-        const float MaxWindupSpeedUp = 2.4f, MinWindupSpeed = 0.75f, MaxRecoverySpeedUp = 2.2f, MinRecoverySpeed = 0.8f;
+        /// <summary>Fastest and slowest a strike's wind-up and recovery may be played (1 = as authored).</summary>
+        public const float MaxWindupSpeedUp = 2.4f, MinWindupSpeed = 0.75f, MaxRecoverySpeedUp = 2.2f, MinRecoverySpeed = 0.8f;
 
         readonly FightAnimationSet set;
-        readonly float[] baseGround = new float[6];
         readonly float[] slotGround = new float[2];
         readonly float[] slotYaw = new float[2];
         readonly Quaternion restRotation;
@@ -57,12 +57,12 @@ namespace NineToFight.Characters
         float actionStart, fadeIn = 0.08f, fadeOut = 0.15f;
         // Attack timing: the move's frame data and the clip's measured window.
         float preImpact, postImpact, clipStart, clipImpact, clipEnd;
+        // Reactions: how long the flinch shows before it fades back to the stance.
+        float reactionEnd;
         bool hold;
         int nextHit;
 
         public Animator Animator { get; }
-        /// <summary>0 = item held out the front of the fist (guard, punches); 1 = swung like a weapon.</summary>
-        public float SwingGrip { get; private set; }
         float extraGround;
         // Feet on the floor for the stance and locomotion: measured after each evaluation.
         Transform leftFoot, rightFoot;
@@ -84,12 +84,6 @@ namespace NineToFight.Characters
             bodyScale = animator.transform.localScale.y;
             // Where a planted foot belongs: the skeleton's foot height in its rest pose, on the floor.
             sole = restY + set.footHeight * bodyScale;
-            baseGround[RelaxedInput] = set.GroundFor(set.relaxedIdle);
-            baseGround[FightInput] = set.GroundFor(set.fightIdle);
-            baseGround[BlockInput] = set.GroundFor(set.block);
-            baseGround[WalkInput] = set.GroundFor(set.walk);
-            baseGround[RunInput] = set.GroundFor(set.run);
-            baseGround[AirInput] = set.GroundFor(set.run);
             graph = PlayableGraph.Create(animator.name + " Fight");
             graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
             var output = AnimationPlayableOutput.Create(graph, "Body", animator);
@@ -125,8 +119,8 @@ namespace NineToFight.Characters
             graph.Play();
         }
 
-        // Foot IK stays off everywhere: blending a clip that has IK goals with one that has none pulls both feet
-        // toward the hips and folds the legs. The grounding below keeps the feet on the floor instead.
+        // Imported stance loops need their authored goals to preserve foot placement when retargeted.
+        // Native locomotion includes matching goals for blending; its own bone pose needs no IK pass.
         AnimationClipPlayable Clip(AnimationClip clip, bool footIK = false)
         {
             var p = AnimationClipPlayable.Create(graph, clip);
@@ -136,7 +130,7 @@ namespace NineToFight.Characters
 
         AnimationClipPlayable Loop(AnimationClip clip, bool footIK = false)
         {
-            var p = Clip(clip, footIK);
+            var p = Clip(clip, footIK || clip == set.fightIdle || clip == set.block);
             // Start loops at a random point so a crowd doesn't move in step.
             if (clip != null) p.SetTime(UnityEngine.Random.value * clip.length);
             return p;
@@ -152,29 +146,6 @@ namespace NineToFight.Characters
             var parent = Animator.transform.parent;
             if (leftFoot == null || rightFoot == null || parent == null) return sole;
             return Mathf.Min(parent.InverseTransformPoint(leftFoot.position).y, parent.InverseTransformPoint(rightFoot.position).y);
-        }
-
-        static bool IsSwing(AttackStyle style)
-        {
-            switch (style)
-            {
-                case AttackStyle.Chop:
-                case AttackStyle.Slam:
-                case AttackStyle.Sweep:
-                case AttackStyle.Backhand:
-                case AttackStyle.DiagonalSlash:
-                case AttackStyle.Spin:
-                case AttackStyle.Stamp:
-                case AttackStyle.Cleave:
-                case AttackStyle.Golf:
-                case AttackStyle.Pound:
-                case AttackStyle.Windmill:
-                case AttackStyle.Whip:
-                case AttackStyle.Lunge:
-                    return true;
-                default:
-                    return false;
-            }
         }
 
         public void Dispose()
@@ -197,14 +168,12 @@ namespace NineToFight.Characters
             var found = set.For(style);
             if (found == null) return false;
             strike = found;
-            preImpact = Mathf.Max(AttackPoses.ImpactTime(move.startup, move.active), 0.01f);
-            postImpact = Mathf.Max(move.startup + move.active + move.recovery - preImpact, 0.01f);
+            var window = StrikeWindow(strike, move);
+            preImpact = window.preImpact;
+            postImpact = window.postImpact;
+            clipStart = window.clipStart;
             clipImpact = strike.impact;
-            // Keep the playback rate believable: trim (or extend) the wind-up and recovery windows.
-            clipStart = Mathf.Clamp(strike.start, clipImpact - preImpact * MaxWindupSpeedUp, clipImpact - preImpact * MinWindupSpeed);
-            clipStart = Mathf.Max(0f, clipStart);
-            clipEnd = Mathf.Clamp(strike.end, clipImpact + postImpact * MinRecoverySpeed, clipImpact + postImpact * MaxRecoverySpeedUp);
-            clipEnd = Mathf.Min(strike.clip.length, clipEnd);
+            clipEnd = window.clipEnd;
             hold = moreToCome;
             Begin(strike.clip, Kind.Attack, now, Mathf.Clamp(move.startup * 0.5f, 0.04f, 0.1f), Mathf.Clamp(move.recovery * 0.6f, 0.08f, 0.22f));
             slotGround[current] = strike.ground;
@@ -212,12 +181,46 @@ namespace NineToFight.Characters
             return true;
         }
 
-        /// <summary>Flinch from a hit (alternating head and body hits).</summary>
-        public void React(float now)
+        /// <summary>How one strike is scrubbed to a move's frame data.</summary>
+        public struct Window
+        {
+            /// <summary>Move seconds before and after the impact.</summary>
+            public float preImpact, postImpact;
+            /// <summary>Clip seconds shown over the move: from clipStart through the impact to clipEnd.</summary>
+            public float clipStart, clipEnd;
+            /// <summary>Playback rate of the wind-up (1 = as authored).</summary>
+            public float WindupRate(FightAnimationSet.Strike strike) => (strike.impact - clipStart) / preImpact;
+            /// <summary>Playback rate of the recovery (1 = as authored).</summary>
+            public float RecoveryRate(FightAnimationSet.Strike strike) => (clipEnd - strike.impact) / postImpact;
+        }
+
+        /// <summary>
+        /// Lines a strike's clip up with a move: the clip's impact frame lands at the move's impact time, and
+        /// the wind-up and recovery are trimmed (or extended) so neither plays unbelievably fast or slow.
+        /// </summary>
+        public static Window StrikeWindow(FightAnimationSet.Strike strike, FightingMove move)
+        {
+            var w = new Window();
+            w.preImpact = Mathf.Max(FightingMove.ImpactTime(move.startup, move.active), 0.01f);
+            w.postImpact = Mathf.Max(move.startup + move.active + move.recovery - w.preImpact, 0.01f);
+            float impact = strike.impact;
+            w.clipStart = Mathf.Clamp(strike.start, impact - w.preImpact * MaxWindupSpeedUp, impact - w.preImpact * MinWindupSpeed);
+            w.clipStart = Mathf.Max(0f, w.clipStart);
+            w.clipEnd = Mathf.Clamp(strike.end, impact + w.postImpact * MinRecoverySpeed, impact + w.postImpact * MaxRecoverySpeedUp);
+            w.clipEnd = Mathf.Min(strike.clip.length, w.clipEnd);
+            return w;
+        }
+
+        /// <summary>
+        /// Flinch from a hit (alternating head and body hits). The flinch shows for <paramref name="duration"/>
+        /// seconds (the stun) and then fades back, rather than playing the whole clip after control returns.
+        /// </summary>
+        public void React(float now, float duration = float.MaxValue)
         {
             if (set.hits == null || set.hits.Length == 0) return;
             var clip = set.hits[nextHit++ % set.hits.Length];
             Begin(clip, Kind.Reaction, now, 0.04f, 0.2f);
+            reactionEnd = Mathf.Min(duration + fadeOut, clip.length);
             slotGround[current] = set.GroundFor(clip);
             slotYaw[current] = 0f;
         }
@@ -309,8 +312,8 @@ namespace NineToFight.Characters
                     }
                     case Kind.Reaction:
                         slots[current].SetTime(Mathf.Min(t, actionClip.length));
-                        if (t >= actionClip.length) kind = Kind.None;
-                        else target = t < actionClip.length - fadeOut ? 1f : 0f;
+                        if (t >= reactionEnd) kind = Kind.None;
+                        else target = t < reactionEnd - fadeOut ? 1f : 0f;
                         break;
                     case Kind.Knockout:
                         slots[current].SetTime(Mathf.Min(t, actionClip.length));
@@ -318,9 +321,6 @@ namespace NineToFight.Characters
                         break;
                 }
             }
-            // Weapon swings turn the item to stick out past the thumb; everything else keeps it out the front.
-            bool swinging = kind == Kind.Attack && strike != null && IsSwing(strike.style);
-            SwingGrip = Mathf.MoveTowards(SwingGrip, swinging ? 1f : 0f, dt / 0.12f);
             float rate = target > actionWeight ? 1f / Mathf.Max(fadeIn, 0.01f) : 1f / Mathf.Max(fadeOut, 0.01f);
             actionWeight = Mathf.MoveTowards(actionWeight, target, dt * rate);
             crossfade = Mathf.MoveTowards(crossfade, 1f, dt / Mathf.Max(fadeIn, 0.01f));

@@ -75,7 +75,7 @@ namespace NineToFight.Tests
                         // Game time must run (a stray Esc or P pauses the game and would freeze these loops).
                         Time.timeScale = 1f;
                         var move = new FightingMove { style = style, startup = 0.3f, active = 0.12f, recovery = 0.4f };
-                        float impact = AttackPoses.ImpactTime(move.startup, move.active);
+                        float impact = FightingMove.ImpactTime(move.startup, move.active);
                         var facing = Flat(player.Motor.FacingDirection);
                         var bones = FightAnimationSet.StrikingBones(style).Select(B).ToArray();
                         player.Visual.PlayAttack(move);

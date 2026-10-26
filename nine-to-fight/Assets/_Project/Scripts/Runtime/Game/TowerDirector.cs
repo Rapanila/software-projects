@@ -103,8 +103,16 @@ namespace NineToFight.Game
         public void PromoteSceneBosses()
         {
             foreach (var enemy in EnemyBrain.Active.ToArray())
-                if (enemy.WorkerClass != null && enemy.WorkerClass.tier >= 3 && enemy.Boss == BossRank.None)
-                    enemy.Configure(enemy.WorkerClass, BossRank.MiniBoss);
+            {
+                if (enemy.WorkerClass == null || enemy.WorkerClass.tier < 3 || enemy.Boss != BossRank.None) continue;
+                // A copy, so the shared asset isn't scaled; then the same boss treatment as staged floors.
+                var w = Instantiate(enemy.WorkerClass);
+                runtimeAssets.Add(w);
+                w.name = enemy.WorkerClass.name;
+                w.attack = w.attack.Clone();
+                ApplyBossRank(w, BossRank.MiniBoss);
+                enemy.Configure(w, BossRank.MiniBoss);
+            }
         }
 
         /// <summary>Clears the room and stages <paramref name="floor"/>. Returns the plan used.</summary>
@@ -131,6 +139,7 @@ namespace NineToFight.Game
             }
             foreach (var p in Current.coffee) SpawnPickup(PickupKind.Coffee, p);
             foreach (var p in Current.reviews) SpawnPickup(PickupKind.PerformanceReview, p);
+            foreach (var (p, move) in Current.seminars) SpawnPickup(PickupKind.TrainingSeminar, p)?.Teach(move);
             Relight(Current);
             Repaint(Current);
             return Current;
@@ -244,11 +253,22 @@ namespace NineToFight.Game
             w.maxHealth *= plan.healthScale;
             w.xpReward = Mathf.RoundToInt(w.xpReward * plan.xpScale);
             w.attack = w.attack.Clone();
+            if (!string.IsNullOrEmpty(who.prop))
+            {
+                w.attack.prop = who.prop;
+                w.attack.style = who.style;
+            }
             w.attack.damage *= plan.damageScale;
             w.aggroRange = Mathf.Max(w.aggroRange, 10f);
             w.attackCooldown *= Mathf.Lerp(1f, 0.75f, (plan.number - 1) / (float)(TowerPlan.FloorCount - 1));
+            ApplyBossRank(w, who.boss);
+            return w;
+        }
 
-            switch (who.boss)
+        /// <summary>Bosses are bigger, tougher, steadier and worth more; the CEO also hits harder and faster.</summary>
+        public static void ApplyBossRank(WorkerClass w, BossRank rank)
+        {
+            switch (rank)
             {
                 case BossRank.MiniBoss:
                     w.maxHealth *= 2.2f;
@@ -266,14 +286,14 @@ namespace NineToFight.Game
                     w.xpReward *= 5;
                     break;
             }
-            return w;
         }
 
-        public void SpawnPickup(PickupKind kind, Vector3 position)
+        public Pickup SpawnPickup(PickupKind kind, Vector3 position)
         {
-            if (!pickupTemplates.TryGetValue(kind, out var template)) return;
+            if (!pickupTemplates.TryGetValue(kind, out var template)) return null;
             var pickup = Instantiate(template, position, Quaternion.identity, spawned);
             pickup.gameObject.SetActive(true);
+            return pickup;
         }
 
         void OnEnemyDefeated(EnemyBrain enemy)

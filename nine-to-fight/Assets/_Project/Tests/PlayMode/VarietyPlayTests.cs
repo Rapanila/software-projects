@@ -139,19 +139,20 @@ namespace NineToFight.Tests
             yield return Setup();
             foreach (var e in EnemyBrain.Active.ToList()) e.Health.TakeDamage(new DamageInfo { amount = 9999f });
             yield return null;
+            GameFlow.ForcePerk = PerkId.StockOptions; // the offer is random; make sure the perk under test is in it
             yield return WalkIntoElevator();
             Assert.AreEqual(GameState.Ending, flow.State);
             Assert.AreEqual(3, flow.PerkOffer.Count, "three benefits to choose from");
             yield return Capture("Perk_Choice");
 
-            var stock = flow.PerkOffer.FirstOrDefault(pk => pk.id == PerkId.StockOptions) ?? flow.PerkOffer[0];
+            var stock = flow.PerkOffer.First(pk => pk.id == PerkId.StockOptions);
             int index = flow.PerkOffer.ToList().IndexOf(stock);
             flow.ChoosePerk(index);
             Assert.AreEqual(1, player.Perks.Stacks(stock.id));
             TowerDirector.ForceEvent = FloorEvent.None;
             flow.NextFloor();
             Assert.AreEqual(2, flow.Floor);
-            if (stock.id == PerkId.StockOptions) Assert.AreEqual(1.15f, player.Attack.PerkDamageMultiplier, 0.001f);
+            Assert.AreEqual(1.15f, player.Attack.PerkDamageMultiplier, 0.001f);
         }
 
         [UnityTest]

@@ -23,7 +23,11 @@ namespace NineToFight.Game
             "REASSIGNED!", "LOGGED OFF!", "CC'D ON THAT!", "PTO!", "TERMINATED!",
         };
 
+        /// <summary>Below this share of health the player hears their heartbeat.</summary>
+        public const float LowHealth = 0.25f;
+
         PlayerController player;
+        float nextHeartbeat;
 
         void OnEnable()
         {
@@ -73,6 +77,16 @@ namespace NineToFight.Game
             player.Dodged += OnDodge;
             player.Progression.Promoted += OnPromoted;
             if (player.Ability != null) player.Ability.Cast += OnAbility;
+        }
+
+        void Update()
+        {
+            // Low on health: a heartbeat that quickens as it drops. Game time, so it stops while paused.
+            if (player == null || player.Health.IsDead || !GameFlow.IsPlaying) return;
+            float health = player.Health.Normalized;
+            if (health >= LowHealth || Time.time < nextHeartbeat) return;
+            GameAudio.Play(Sfx.Heartbeat, Mathf.Lerp(0.9f, 0.5f, health / LowHealth), 0f);
+            nextHeartbeat = Time.time + Mathf.Lerp(0.55f, 0.95f, health / LowHealth);
         }
 
         void OnPlayerAttack(Combat.FightingMove move) => GameAudio.Play(Sfx.Whoosh, 0.45f + Mathf.Min(move.damage, 30f) / 60f);

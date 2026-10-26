@@ -25,7 +25,7 @@ MonoBehaviour:
   depthSpeed: 4.8
   jumpHeight: 1.8
   damageMultiplier: 0.9
-  dodgeCooldown: 0.3
+  dodgeCooldown: 0.45
   lightAttack:
     id: cable_whip
     displayName: Cable Whip

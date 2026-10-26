@@ -23,6 +23,11 @@ namespace NineToFight.Progression
 
         public static string RankTitle(int level) => Ranks[Mathf.Clamp(level, 1, MaxLevel) - 1];
 
-        public static int XpToNextLevel(int level) => 40 + (Mathf.Max(level, 1) - 1) * 30;
+        /// <summary>
+        /// XP from one rank to the next: 100, then 165 more each rank (6,840 to CEO). Paced to the tower's knockout
+        /// XP (which grows 15% a floor): about rank 3 after floor 1, rank 9 (the Super move) on floor 7 and CEO late
+        /// on floor 8, so XP and Career Coaching keep mattering all the way up.
+        /// </summary>
+        public static int XpToNextLevel(int level) => 100 + (Mathf.Max(level, 1) - 1) * 165;
     }
 }

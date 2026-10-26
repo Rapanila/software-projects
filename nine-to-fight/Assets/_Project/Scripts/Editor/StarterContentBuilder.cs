@@ -103,7 +103,7 @@ namespace NineToFight.EditorTools
             it.outfit = "Man_Hoodie";
             it.maxHealth = 80f; it.healthPerLevel = 12f;
             it.moveSpeed = 7.2f; it.depthSpeed = 4.8f; it.jumpHeight = 1.8f;
-            it.damageMultiplier = 0.9f; it.dodgeCooldown = 0.3f;
+            it.damageMultiplier = 0.9f; it.dodgeCooldown = 0.45f;
             it.lightAttack = Move("cable_whip", "Cable Whip", MoveSlot.Light, 1, "Ethernet cable. Category 6 pain.",
                 7f, 1.2f, 0.55f, 3f, 0f, 0.2f, 0.08f, 0.16f, lunge: 1.5f, hitStop: 0.03f, prop: "ethernet_cable", style: AttackStyle.Whip);
             it.heavyAttack = Move("mouse_flail", "Mouse Flail", MoveSlot.Heavy, 1, "A wired mouse spun like a flail.",
@@ -231,27 +231,44 @@ namespace NineToFight.EditorTools
         // ------------------------------------------------------------------ props
 
         /// <summary>
-        /// Office items held in hand. Each prop's grip is at its origin and it extends along -Y,
-        /// so it hangs from the hand at rest and points forward when the arm punches.
+        /// Unposed office items. Per-item, per-body holding transforms and finger poses are authored
+        /// against the original T-pose in HeldItemGrips.json, rather than inferred from item bounds.
         /// </summary>
+        [MenuItem("Nine to Fight/Rebuild Held Items", priority = 10)]
+        public static void RebuildHeldItems()
+        {
+            Materials.Clear();
+            propCatalog = BuildProps();
+            foreach (var name in new[] { "Player", "Coworker" })
+            {
+                string path = $"{PrefabsDir}/{name}.prefab";
+                var root = PrefabUtility.LoadPrefabContents(path);
+                try
+                {
+                    var follower = root.GetComponentInChildren<RigFollower>(true);
+                    var socket = (Transform)new SerializedObject(follower).FindProperty("handSocket").objectReferenceValue;
+                    var rig = follower.ActiveRig;
+                    socket.SetPositionAndRotation(rig.hand.TransformPoint(rig.grip), rig.hand.rotation * rig.gripRotation);
+                    for (int i = 0; i < follower.RigCount; i++)
+                    {
+                        var body = follower.GetRig(i);
+                        var neutral = body.animator.avatar.humanDescription.skeleton.ToDictionary(b => b.name, b => b.rotation);
+                        body.fingerOpen = body.fingers.Select(f => neutral[f.name]).ToArray();
+                    }
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(root); }
+            }
+            AssetDatabase.SaveAssets();
+        }
+
         static PropCatalog BuildProps()
         {
             var entries = new List<PropCatalog.Entry>();
-            // Where the fist closes on each item, measured down the item from its top end (and toward its face).
-            // Long things are held by the handle end, small things around their middle, so the item passes
-            // through the closed hand instead of hanging off the knuckles.
-            var grips = new Dictionary<string, Vector2>
-            {
-                ["calculator"] = new Vector2(0.07f, 0f), ["smartphone"] = new Vector2(0.05f, 0f), ["stapler"] = new Vector2(0.07f, 0f),
-                ["coffee_cup"] = new Vector2(0.08f, 0.04f), ["desk_phone"] = new Vector2(0.16f, 0f), ["audit_stamp"] = new Vector2(0.06f, 0f),
-                ["golf_club"] = new Vector2(0.07f, 0f), ["megaphone"] = new Vector2(0.05f, 0f), ["briefcase"] = new Vector2(0.035f, 0f),
-            };
             void Prop(string id, string name, System.Action<Transform> build)
             {
                 var root = new GameObject("Prop_" + id);
                 build(root.transform);
-                var grip = grips.TryGetValue(id, out var g) ? g : new Vector2(0.06f, 0f);
-                foreach (Transform part in root.transform) part.localPosition += new Vector3(0f, grip.x, -grip.y);
                 var prefab = PrefabUtility.SaveAsPrefabAsset(root, $"{PropsDir}/{id}.prefab");
                 Object.DestroyImmediate(root);
                 entries.Add(new PropCatalog.Entry { id = id, displayName = name, prefab = prefab });
@@ -279,22 +296,24 @@ namespace NineToFight.EditorTools
             });
             Prop("audit_stamp", "Audit Stamp", t =>
             {
-                Part(PrimitiveType.Cylinder, "Handle", t, new Vector3(0f, -0.06f, 0f), new Vector3(0.09f, 0.08f, 0.09f), Mat("Prop_Wood", Hex("8B5A2B"), 0.3f));
-                Part(PrimitiveType.Cube, "Block", t, new Vector3(0f, -0.2f, 0f), new Vector3(0.16f, 0.1f, 0.24f), red);
-                Part(PrimitiveType.Cube, "Rubber", t, new Vector3(0f, -0.26f, 0f), new Vector3(0.15f, 0.03f, 0.22f), Mat("Prop_Ink", Hex("6E0E0A")));
+                var wood = Mat("Prop_Wood", Hex("8B5A2B"), 0.3f);
+                Part(PrimitiveType.Sphere, "Knob", t, new Vector3(0f, 0.095f, 0f), new Vector3(0.05f, 0.05f, 0.05f), wood);
+                Part(PrimitiveType.Cylinder, "Handle", t, Vector3.zero, new Vector3(0.022f, 0.09f, 0.022f), wood);
+                Part(PrimitiveType.Cube, "Block", t, new Vector3(0f, -0.14f, 0f), new Vector3(0.16f, 0.1f, 0.24f), red);
+                Part(PrimitiveType.Cube, "Rubber", t, new Vector3(0f, -0.2f, 0f), new Vector3(0.15f, 0.03f, 0.22f), Mat("Prop_Ink", Hex("6E0E0A")));
             });
             Prop("ethernet_cable", "Ethernet Cable", t =>
             {
                 var blue = Mat("Prop_CableBlue", Hex("2F80ED"), 0.5f);
-                Part(PrimitiveType.Cube, "Cable", t, new Vector3(0f, -0.3f, 0f), new Vector3(0.03f, 0.6f, 0.03f), blue);
-                var tip = Part(PrimitiveType.Cube, "Cable Tip", t, new Vector3(0f, -0.7f, 0.08f), new Vector3(0.03f, 0.25f, 0.03f), blue);
+                Part(PrimitiveType.Cube, "Cable", t, new Vector3(0f, -0.3f, 0f), new Vector3(0.015f, 0.6f, 0.015f), blue);
+                var tip = Part(PrimitiveType.Cube, "Cable Tip", t, new Vector3(0f, -0.7f, 0.08f), new Vector3(0.015f, 0.25f, 0.015f), blue);
                 tip.transform.localRotation = Quaternion.Euler(-35f, 0f, 0f);
                 Part(PrimitiveType.Cube, "Connector", t, new Vector3(0f, -0.82f, 0.16f), new Vector3(0.05f, 0.08f, 0.05f),
                     Mat("Prop_ClearPlastic", new Color(0.85f, 0.9f, 0.95f), 0.9f));
             });
             Prop("mouse", "Computer Mouse", t =>
             {
-                Part(PrimitiveType.Cube, "Cord", t, new Vector3(0f, -0.24f, 0f), new Vector3(0.02f, 0.48f, 0.02f), plasticDark);
+                Part(PrimitiveType.Cube, "Cord", t, new Vector3(0f, -0.24f, 0f), new Vector3(0.015f, 0.48f, 0.015f), plasticDark);
                 Part(PrimitiveType.Sphere, "Mouse", t, new Vector3(0f, -0.55f, 0f), new Vector3(0.1f, 0.18f, 0.12f), plasticLight);
                 Part(PrimitiveType.Cube, "Wheel", t, new Vector3(0f, -0.49f, 0.055f), new Vector3(0.015f, 0.03f, 0.02f), plasticDark);
             });
@@ -312,14 +331,14 @@ namespace NineToFight.EditorTools
             });
             Prop("golf_club", "Golf Club", t =>
             {
-                Part(PrimitiveType.Cylinder, "Grip", t, new Vector3(0f, -0.06f, 0f), new Vector3(0.045f, 0.1f, 0.045f), plasticDark);
-                Part(PrimitiveType.Cylinder, "Shaft", t, new Vector3(0f, -0.6f, 0f), new Vector3(0.022f, 0.5f, 0.022f), metal);
+                Part(PrimitiveType.Cylinder, "Grip", t, new Vector3(0f, -0.06f, 0f), new Vector3(0.022f, 0.1f, 0.022f), plasticDark);
+                Part(PrimitiveType.Cylinder, "Shaft", t, new Vector3(0f, -0.6f, 0f), new Vector3(0.018f, 0.5f, 0.018f), metal);
                 Part(PrimitiveType.Cube, "Head", t, new Vector3(0f, -1.12f, 0.07f), new Vector3(0.08f, 0.07f, 0.2f), Mat("Prop_ClubHead", Hex("3A3F47"), 0.9f));
             });
             Prop("desk_phone", "Desk Phone Handset", t =>
             {
                 var beige = Mat("Prop_Beige", Hex("D8CFC0"), 0.3f);
-                Part(PrimitiveType.Cube, "Handle", t, new Vector3(0f, -0.16f, 0f), new Vector3(0.06f, 0.34f, 0.06f), beige);
+                Part(PrimitiveType.Cube, "Handle", t, new Vector3(0f, -0.16f, 0f), new Vector3(0.045f, 0.34f, 0.05f), beige);
                 Part(PrimitiveType.Cube, "Earpiece", t, new Vector3(0f, -0.01f, 0.04f), new Vector3(0.09f, 0.08f, 0.11f), beige);
                 Part(PrimitiveType.Cube, "Mouthpiece", t, new Vector3(0f, -0.32f, 0.04f), new Vector3(0.09f, 0.08f, 0.11f), beige);
                 var cord = Part(PrimitiveType.Cube, "Cord", t, new Vector3(0f, -0.48f, -0.04f), new Vector3(0.02f, 0.3f, 0.02f), plasticDark);
@@ -339,9 +358,11 @@ namespace NineToFight.EditorTools
             });
             Prop("megaphone", "Megaphone", t =>
             {
-                Part(PrimitiveType.Cube, "Handle", t, new Vector3(0f, -0.04f, 0f), new Vector3(0.04f, 0.1f, 0.04f), plasticDark);
-                Part(PrimitiveType.Cylinder, "Body", t, new Vector3(0f, -0.22f, 0f), new Vector3(0.12f, 0.14f, 0.12f), plasticLight);
-                Part(PrimitiveType.Cylinder, "Bell", t, new Vector3(0f, -0.4f, 0f), new Vector3(0.24f, 0.05f, 0.24f), Mat("Prop_Orange", Hex("F39C12"), 0.4f));
+                Part(PrimitiveType.Cylinder, "Handle", t, Vector3.zero, new Vector3(0.025f, 0.085f, 0.025f), plasticDark);
+                var body = Part(PrimitiveType.Cylinder, "Body", t, new Vector3(0f, 0.15f, 0.08f), new Vector3(0.12f, 0.14f, 0.12f), plasticLight);
+                body.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                var bell = Part(PrimitiveType.Cylinder, "Bell", t, new Vector3(0f, 0.15f, 0.28f), new Vector3(0.24f, 0.05f, 0.24f), Mat("Prop_Orange", Hex("F39C12"), 0.4f));
+                bell.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             });
             Prop("keyboard", "Keyboard", t =>
             {
@@ -356,10 +377,14 @@ namespace NineToFight.EditorTools
             });
             Prop("briefcase", "Briefcase", t =>
             {
-                Part(PrimitiveType.Cube, "Handle", t, new Vector3(0f, -0.03f, 0f), new Vector3(0.03f, 0.05f, 0.14f), plasticDark);
-                Part(PrimitiveType.Cube, "Case", t, new Vector3(0f, -0.26f, 0f), new Vector3(0.14f, 0.38f, 0.52f), leather);
-                Part(PrimitiveType.Cube, "Clasp L", t, new Vector3(0.072f, -0.1f, -0.12f), new Vector3(0.01f, 0.04f, 0.05f), Mat("Prop_Gold", Hex("D4AF37"), 0.8f));
-                Part(PrimitiveType.Cube, "Clasp R", t, new Vector3(0.072f, -0.1f, 0.12f), new Vector3(0.01f, 0.04f, 0.05f), Mat("Prop_Gold", Hex("D4AF37"), 0.8f));
+                // Carried like a suitcase: the bar runs through the fist, the posts pass the ends of the fist
+                // and the case hangs off the knuckle side.
+                Part(PrimitiveType.Cylinder, "Handle", t, Vector3.zero, new Vector3(0.022f, 0.09f, 0.022f), plasticDark);
+                foreach (float y in new[] { -0.08f, 0.08f })
+                    Part(PrimitiveType.Cube, "Post", t, new Vector3(0f, y, 0.035f), new Vector3(0.02f, 0.02f, 0.07f), plasticDark);
+                Part(PrimitiveType.Cube, "Case", t, new Vector3(0f, 0f, 0.25f), new Vector3(0.14f, 0.52f, 0.38f), leather);
+                Part(PrimitiveType.Cube, "Clasp L", t, new Vector3(0.072f, -0.12f, 0.12f), new Vector3(0.01f, 0.05f, 0.04f), Mat("Prop_Gold", Hex("D4AF37"), 0.8f));
+                Part(PrimitiveType.Cube, "Clasp R", t, new Vector3(0.072f, 0.12f, 0.12f), new Vector3(0.01f, 0.05f, 0.04f), Mat("Prop_Gold", Hex("D4AF37"), 0.8f));
             });
             Prop("coffee_cup", "Coffee Cup", t =>
             {
@@ -369,12 +394,13 @@ namespace NineToFight.EditorTools
             });
             Prop("rolled_report", "Rolled-Up Report", t =>
             {
-                Part(PrimitiveType.Cylinder, "Roll", t, new Vector3(0f, -0.3f, 0f), new Vector3(0.08f, 0.3f, 0.08f), paper);
-                Part(PrimitiveType.Cylinder, "Band", t, new Vector3(0f, -0.3f, 0f), new Vector3(0.085f, 0.02f, 0.085f), red);
+                Part(PrimitiveType.Cylinder, "Roll", t, new Vector3(0f, -0.3f, 0f), new Vector3(0.022f, 0.3f, 0.022f), paper);
+                Part(PrimitiveType.Cylinder, "Band", t, new Vector3(0f, -0.3f, 0f), new Vector3(0.026f, 0.02f, 0.026f), red);
             });
 
             var catalog = Asset<PropCatalog>(Root + "/Data", "PropCatalog");
             catalog.SetEntries(entries);
+            HeldItemFitting.AssignProfiles(catalog);
             EditorUtility.SetDirty(catalog);
             return catalog;
         }

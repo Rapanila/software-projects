@@ -24,6 +24,14 @@ namespace NineToFight.Combat
             };
         }
 
+        /// <summary>Marks a move as thrown: the item leaves the hand at the hit and flies down the lane.</summary>
+        static FightingMove Thrown(FightingMove move, float speed, bool pierce = false)
+        {
+            move.throwSpeed = speed;
+            move.pierce = pierce;
+            return move;
+        }
+
         static readonly Dictionary<string, FightingMove[]> Book = new Dictionary<string, FightingMove[]>
         {
             ["Accountant"] = new[]
@@ -50,9 +58,9 @@ namespace NineToFight.Combat
             ["ITSupport"] = new[]
             {
                 M("ping_flood", "Ping Flood", MoveSlot.Special, 3, "ethernet_cable", AttackStyle.LeadJab,
-                    "Jab, cross, jab, then a hook. Request timed out.",
+                    "Jab, cross, hook, then a push kick. Request timed out.",
                     4.5f, 1.3f, 0.55f, 1.5f, 0f, 0.11f, 0.05f, 0.13f, cooldown: 1.8f, lunge: 1f, hitStop: 0.025f, hits: 4,
-                    combo: new[] { AttackStyle.Jab, AttackStyle.LeadJab, AttackStyle.Hook }),
+                    combo: new[] { AttackStyle.Jab, AttackStyle.Hook, AttackStyle.Kick }),
                 M("ctrl_alt_del", "Ctrl+Alt+Del", MoveSlot.Light, 5, "mouse", AttackStyle.Hook,
                     "Ctrl (hook), Alt (backhand), Del (straight down).",
                     5f, 1f, 0.6f, 2.5f, 0f, 0.17f, 0.05f, 0.14f, lunge: 1.5f, hitStop: 0.03f, hits: 3,
@@ -100,9 +108,9 @@ namespace NineToFight.Combat
                 M("restraining_order", "Restraining Order", MoveSlot.Heavy, 6, "rolled_report", AttackStyle.Dropkick,
                     "A two-footed dropkick. Stay 500 feet away.",
                     24f, 1.1f, 0.85f, 18f, 4f, 0.26f, 0.12f, 0.3f, lunge: 3f, hitStop: 0.09f),
-                M("wellness_check", "Wellness Check", MoveSlot.Special, 7, "coffee_cup", AttackStyle.Hurl,
-                    "A thrown mug of concern. Heals you for 60% of the damage.",
-                    20f, 1.4f, 1.2f, 9f, 3f, 0.32f, 0.14f, 0.3f, cooldown: 3f, hitStop: 0.07f, healOnHit: 0.6f),
+                Thrown(M("wellness_check", "Wellness Check", MoveSlot.Special, 7, "coffee_cup", AttackStyle.Hurl,
+                    "A thrown mug of concern, right down the lane. Heals you for 60% of the damage.",
+                    20f, 1.4f, 1.2f, 9f, 3f, 0.32f, 0.14f, 0.3f, cooldown: 3f, hitStop: 0.07f, healOnHit: 0.6f), 16f),
                 M("mass_layoff", "Mass Layoff", MoveSlot.Super, 9, "megaphone", AttackStyle.Stamp,
                     "A shockwave that lets go of everyone nearby.",
                     44f, 0.3f, 2.6f, 20f, 7f, 0.38f, 0.18f, 0.4f, cooldown: 6f, hitStop: 0.14f),

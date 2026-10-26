@@ -21,12 +21,6 @@ namespace NineToFight.EditorTools
 
         static bool IsMixamo(string path) => path.StartsWith(Folder + "/") && path.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase);
 
-        static bool Spins(string path)
-        {
-            string name = System.IO.Path.GetFileNameWithoutExtension(path);
-            return name == "spin_attack" || name == "two_hand_cleave" || name == "windmill";
-        }
-
         static bool Loops(string path)
         {
             string name = System.IO.Path.GetFileNameWithoutExtension(path);
@@ -57,6 +51,9 @@ namespace NineToFight.EditorTools
                 var c = clips[i];
                 c.name = name;
                 c.loopTime = Loops(assetPath);
+                // This 30 fps take waits in guard for a second before the knockout begins.
+                // Start at the blow so a killing hit immediately flows into the fall.
+                if (name == "knockout") c.firstFrame += 30f;
                 // The whole body turns with the move (hips into a punch, round on a spin): dropping that turn
                 // left the hips locked while the spine and head kept twisting, breaking the body. The clip is
                 // lined up on the body's own orientation, so it faces forward instead of wherever the actor stood.

@@ -9,7 +9,7 @@ namespace NineToFight.Player
     {
         const float NavigateThreshold = 0.5f;
 
-        InputAction move, jump, lightAttack, heavyAttack, special, super, ability, dodge, submit, restart, pause, mute, cancel;
+        InputAction move, jump, lightAttack, heavyAttack, special, super, ability, dodge, submit, startButton, restart, pause, mute, cancel;
         int lastNavigateFrame = -1, lastNavigateYFrame = -1;
         int navigateThisFrame, navigateYThisFrame;
         float previousNavigateX, previousNavigateY;
@@ -36,7 +36,7 @@ namespace NineToFight.Player
         public bool CancelPressed => cancel.WasPressedThisFrame();
 
         public Vector2 Move => move.ReadValue<Vector2>();
-        public bool SuperPressed => super.WasPressedThisFrame();
+        public bool SuperPressed => !HotbarChord && super.WasPressedThisFrame();
         public bool AbilityPressed => ability.WasPressedThisFrame();
 
         /// <summary>-1/+1 on the frame left/right is first pushed (menus), otherwise 0.</summary>
@@ -56,12 +56,19 @@ namespace NineToFight.Player
                 return navigateThisFrame;
             }
         }
-        public bool JumpPressed => jump.WasPressedThisFrame();
-        public bool LightPressed => lightAttack.WasPressedThisFrame();
-        public bool HeavyPressed => heavyAttack.WasPressedThisFrame();
-        public bool SpecialPressed => special.WasPressedThisFrame();
-        public bool DodgePressed => dodge.WasPressedThisFrame();
+        // While LT is held the gamepad's face buttons and right shoulder pick hotbar slots instead (see HotbarPressed).
+        public bool JumpPressed => !HotbarChord && jump.WasPressedThisFrame();
+        public bool LightPressed => !HotbarChord && lightAttack.WasPressedThisFrame();
+        public bool HeavyPressed => !HotbarChord && heavyAttack.WasPressedThisFrame();
+        public bool SpecialPressed => !HotbarChord && special.WasPressedThisFrame();
+        public bool DodgePressed => !HotbarChord && dodge.WasPressedThisFrame();
+
+        /// <summary>LT held: the gamepad's hotbar layer (X Y B A RB RT = slots 1-6).</summary>
+        public bool HotbarChord => hotbarChord != null && hotbarChord.IsPressed();
+        /// <summary>Confirm in the pause and options menus: Enter or the gamepad's A (Start is Pause there).</summary>
         public bool SubmitPressed => submit.WasPressedThisFrame();
+        /// <summary>Confirm on screens with nothing to pause (title, department select, endings): also Start.</summary>
+        public bool ConfirmPressed => submit.WasPressedThisFrame() || startButton.WasPressedThisFrame();
         public bool RestartPressed => restart.WasPressedThisFrame();
         public bool PausePressed => pause.WasPressedThisFrame();
         public bool MutePressed => mute.WasPressedThisFrame();
@@ -85,7 +92,16 @@ namespace NineToFight.Player
             super = Button("Super", "<Keyboard>/u", "<Gamepad>/rightTrigger");
             ability = Button("Ability", "<Keyboard>/q", "<Gamepad>/leftShoulder");
             dodge = Button("Dodge", "<Keyboard>/l", "<Keyboard>/leftShift", "<Gamepad>/buttonEast");
-            submit = Button("Submit", "<Keyboard>/enter", "<Keyboard>/numpadEnter", "<Gamepad>/start");
+            // Start is Pause; A confirms. Start also confirms where there's nothing to pause (ConfirmPressed).
+            submit = Button("Submit", "<Keyboard>/enter", "<Keyboard>/numpadEnter", "<Gamepad>/buttonSouth");
+            startButton = Button("Start", "<Gamepad>/start");
+            hotbarChord = Button("HotbarChord", "<Gamepad>/leftTrigger");
+            padHotbar = new[]
+            {
+                Button("PadSlot1", "<Gamepad>/buttonWest"), Button("PadSlot2", "<Gamepad>/buttonNorth"),
+                Button("PadSlot3", "<Gamepad>/buttonEast"), Button("PadSlot4", "<Gamepad>/buttonSouth"),
+                Button("PadSlot5", "<Gamepad>/rightShoulder"), Button("PadSlot6", "<Gamepad>/rightTrigger"),
+            };
             restart = Button("Restart", "<Keyboard>/r", "<Gamepad>/select");
             pause = Button("Pause", "<Keyboard>/escape", "<Keyboard>/p", "<Gamepad>/start");
             mute = Button("Mute", "<Keyboard>/m");
@@ -100,15 +116,19 @@ namespace NineToFight.Player
             return action;
         }
 
-        InputAction[] hotbar;
+        InputAction[] hotbar, padHotbar;
+        InputAction hotbarChord;
 
-        /// <summary>Index 0..9 of the hotbar key (1..9, 0) pressed this frame, or -1.</summary>
+        /// <summary>Index 0..9 of the hotbar key (1..9, 0) pressed this frame, or -1. On a gamepad: LT + X Y B A RB RT for slots 1-6.</summary>
         public int HotbarPressed
         {
             get
             {
                 for (int i = 0; i < hotbar.Length; i++)
                     if (hotbar[i].WasPressedThisFrame()) return i;
+                if (HotbarChord)
+                    for (int i = 0; i < padHotbar.Length; i++)
+                        if (padHotbar[i].WasPressedThisFrame()) return i;
                 return -1;
             }
         }
@@ -127,9 +147,11 @@ namespace NineToFight.Player
         {
             get
             {
-                foreach (var a in new[] { move, jump, lightAttack, heavyAttack, special, super, ability, dodge, submit, restart, pause, mute, cancel })
+                foreach (var a in new[] { move, jump, lightAttack, heavyAttack, special, super, ability, dodge, submit, startButton, restart, pause, mute, cancel })
                     yield return a;
                 foreach (var a in hotbar) yield return a;
+                foreach (var a in padHotbar) yield return a;
+                yield return hotbarChord;
             }
         }
 

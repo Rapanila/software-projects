@@ -50,6 +50,10 @@ namespace NineToFight.UI
         CanvasGroup toastGroup, bannerGroup;
         RectTransform bannerRect, toastRect, bannerStroke;
         float toastUntil, bannerUntil, bannerShownAt = -10f, toastShownAt = -10f;
+        /// <summary>Banners raised while one is up wait their turn ("Promoted!" then "New move").</summary>
+        readonly System.Collections.Generic.Queue<(string title, string body)> bannerQueue =
+            new System.Collections.Generic.Queue<(string title, string body)>();
+        const float BannerSeconds = 3f;
 
         // Tutorial hint
         RectTransform hintRoot, hintPrompts;
@@ -83,13 +87,23 @@ namespace NineToFight.UI
             toastShownAt = Time.unscaledTime;
         }
 
+        /// <summary>Shows a banner, or queues it behind the one on screen so neither gets lost.</summary>
         public void ShowBanner(string title, string body)
+        {
+            if (Time.unscaledTime < bannerUntil || bannerQueue.Count > 0) bannerQueue.Enqueue((title, body));
+            else DisplayBanner(title, body);
+        }
+
+        /// <summary>The banner on screen right now (empty when none is showing).</summary>
+        public string BannerTitle => Time.unscaledTime < bannerUntil ? bannerTitle.text : "";
+        public int QueuedBanners => bannerQueue.Count;
+
+        void DisplayBanner(string title, string body)
         {
             bannerTitle.text = title;
             bannerBody.text = body;
-            // Re-unfold only if it wasn't already showing; back-to-back banners just swap text.
-            if (Time.unscaledTime > bannerUntil - 0.2f) bannerShownAt = Time.unscaledTime;
-            bannerUntil = Time.unscaledTime + 3f;
+            bannerShownAt = Time.unscaledTime;
+            bannerUntil = Time.unscaledTime + BannerSeconds;
         }
 
         public void RefreshFloor()
@@ -98,9 +112,6 @@ namespace NineToFight.UI
             floorNumberText.text = $"Floor {flow.Floor}";
             floorNameText.text = flow.FloorName;
         }
-
-        /// <summary>Kept for compatibility; floors now change behind the elevator doors.</summary>
-        public void FadeIn() { }
 
         /// <summary>Bumps the combo counter when it reaches a new rating.</summary>
         public void PunchCombo() => comboPunch = 1f;
@@ -158,6 +169,11 @@ namespace NineToFight.UI
 
         void UpdateMessages(float now)
         {
+            if (now >= bannerUntil && bannerQueue.Count > 0)
+            {
+                var next = bannerQueue.Dequeue();
+                DisplayBanner(next.title, next.body);
+            }
             toastGroup.alpha = Mathf.Clamp01((toastUntil - now) / 0.3f);
             float p = EaseOutBack((now - toastShownAt) / 0.3f);
             toastRect.anchoredPosition = new Vector2(0f, Mathf.LerpUnclamped(40f, 0f, p));
@@ -292,7 +308,7 @@ namespace NineToFight.UI
                 float remaining = slot.unlocked && slot.move.cooldown > 0f ? attack.CooldownRemaining(slot.move) : 0f;
                 slot.cooldown.fillAmount = slot.move.cooldown > 0f ? Mathf.Clamp01(remaining / slot.move.cooldown) : 0f;
                 slot.cooldownText.text = remaining > 0.05f ? remaining.ToString(remaining < 1f ? "0.0" : "0") : "";
-                AnimateKey(slot, attack.Current == slot.move);
+                AnimateKey(slot, attack.Current == slot.move, slot.unlocked ? UiKit.Paper : UiKit.Steel);
             }
 
             var caster = player.Ability;
@@ -301,18 +317,17 @@ namespace NineToFight.UI
             if (ability == null) return;
             abilitySlot.name.text = ability.displayName;
             abilitySlot.dot.color = ability.color;
-            abilitySlot.cap.color = caster.IsReady || caster.IsActive ? UiKit.Paper : UiKit.Steel;
             abilitySlot.cooldown.fillAmount = Mathf.Clamp01(caster.CooldownFraction);
             abilitySlot.cooldownText.text = !caster.IsReady ? Mathf.CeilToInt(caster.CooldownRemaining).ToString() : "";
-            AnimateKey(abilitySlot, caster.IsActive);
+            AnimateKey(abilitySlot, caster.IsActive, caster.IsReady || caster.IsActive ? UiKit.Paper : UiKit.Steel);
         }
 
-        static void AnimateKey(HotbarSlot slot, bool down)
+        static void AnimateKey(HotbarSlot slot, bool down, Color rest)
         {
-            // Pressed keys sink into the keyboard and catch the highlighter.
+            // Pressed keys sink into the keyboard and catch the highlighter, then fade back to their resting colour.
             slot.press = Glide(slot.press, down ? 1f : 0f, down ? 40f : 14f);
             slot.root.anchoredPosition = new Vector2(slot.root.anchoredPosition.x, -6f * slot.press);
-            if (down) slot.cap.color = Color.Lerp(UiKit.Paper, UiKit.Highlighter, slot.press);
+            slot.cap.color = Color.Lerp(rest, UiKit.Highlighter, slot.press);
         }
 
         // ================================================================ portrait

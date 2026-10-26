@@ -20,11 +20,14 @@ namespace NineToFight.EditorTools
         const string GeneratedClipsDir = Root + "/Art/Animations/Generated";
         static FightAnimationSet fightAnimations;
 
+        // backhand.fbx and whip_crack.fbx are imported but deliberately not used: on the office workers the backhand
+        // turns the head 113 degrees away from the target and the whip twists the spine 107 degrees off the hips
+        // (BodyMechanicsTests allows 90 and 80), so Backhand and Whip borrow the swing and the diagonal slash.
         static readonly (AttackStyle style, string clip)[] StrikeClips =
         {
             (AttackStyle.Jab, "cross"), (AttackStyle.LeadJab, "jab"), (AttackStyle.Hook, "hook"), (AttackStyle.Uppercut, "uppercut"),
             (AttackStyle.Elbow, "elbow"), (AttackStyle.Knee, "knee"), (AttackStyle.Kick, "front_kick"),
-            (AttackStyle.FlyingKick, "flying_kick"), (AttackStyle.Dropkick, "dropkick"), (AttackStyle.SupermanPunch, "cross"),
+            (AttackStyle.FlyingKick, "flying_kick"), (AttackStyle.Dropkick, "dropkick"),
             (AttackStyle.Chop, "overhead_chop"), (AttackStyle.Sweep, "horizontal_swing"), (AttackStyle.Backhand, "horizontal_swing"),
             (AttackStyle.DiagonalSlash, "diagonal_slash"), (AttackStyle.Spin, "spin_attack"), (AttackStyle.Stamp, "jump_slam"),
             (AttackStyle.Slam, "two_hand_slam"), (AttackStyle.Cleave, "two_hand_cleave"), (AttackStyle.Golf, "golf_swing"),
@@ -233,6 +236,8 @@ namespace NineToFight.EditorTools
             graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
             var output = AnimationPlayableOutput.Create(graph, "Body", animator);
             var playable = AnimationClipPlayable.Create(graph, clip);
+            // Native locomotion is played without a second IK pass at runtime. Measure the same pose.
+            if (AssetDatabase.GetAssetPath(clip).StartsWith(GeneratedClipsDir + "/")) playable.SetApplyFootIK(false);
             output.SetSourcePlayable(playable);
             graph.Play();
             for (int f = 0; f < frames; f++)
@@ -292,6 +297,22 @@ namespace NineToFight.EditorTools
         /// One of the source model's own animations as a humanoid clip: each frame is posed on the skeleton
         /// and read back as muscle values. Fingers are left out (the hands are held in fists anyway).
         /// </summary>
+        /// <summary>Makes a looping curve end where it starts, spreading the correction over the last <paramref name="frames"/> keys.</summary>
+        public static void CloseLoop(AnimationCurve curve, int frames)
+        {
+            var keys = curve.keys;
+            if (keys.Length < 3) return;
+            float gap = keys[0].value - keys[keys.Length - 1].value;
+            if (Mathf.Abs(gap) < 1e-6f) return;
+            int span = Mathf.Min(frames, keys.Length - 1);
+            for (int k = 0; k < span; k++)
+            {
+                int index = keys.Length - span + k;
+                keys[index].value += gap * (k + 1) / span;
+            }
+            curve.keys = keys;
+        }
+
         static AnimationClip ConvertClip(Skeleton skeleton, Avatar avatar, string name)
         {
             var glb = skeleton.glb;
@@ -324,6 +345,11 @@ namespace NineToFight.EditorTools
             var rootCurves = new[] { "RootT.x", "RootT.y", "RootT.z", "RootQ.x", "RootQ.y", "RootQ.z", "RootQ.w" }
                 .ToDictionary(n => n, n => new AnimationCurve());
             var muscleCurves = muscles.ToDictionary(i => i, i => new AnimationCurve());
+            // Humanoid stance clips contain IK goals as well as muscles. Missing goals in a blended
+            // locomotion input collapse the legs when the stance's foot-placement solver is enabled.
+            var goalNames = new[] { "LeftFoot", "RightFoot" };
+            var footCurves = goalNames.SelectMany(goal => new[] { "T.x", "T.y", "T.z", "Q.x", "Q.y", "Q.z", "Q.w" }
+                .Select(component => goal + component)).ToDictionary(n => n, n => new AnimationCurve());
 
             // Feet hang off the shins here, but the source animates them from the root (IK): pose them in world space.
             var feet = new Dictionary<int, (Vector3? p, Quaternion? r)>();
@@ -368,6 +394,19 @@ namespace NineToFight.EditorTools
                 rootCurves["RootQ.z"].AddKey(t, pose.bodyRotation.z);
                 rootCurves["RootQ.w"].AddKey(t, pose.bodyRotation.w);
                 foreach (int i in muscles) muscleCurves[i].AddKey(t, pose.muscles[i]);
+                for (int goal = 0; goal < goalNames.Length; goal++)
+                {
+                    var position = pose.ikGoalPositions[goal];
+                    var rotation = pose.internalIkGoalRotations[goal];
+                    string prefix = goalNames[goal];
+                    footCurves[prefix + "T.x"].AddKey(t, position.x);
+                    footCurves[prefix + "T.y"].AddKey(t, position.y);
+                    footCurves[prefix + "T.z"].AddKey(t, position.z);
+                    footCurves[prefix + "Q.x"].AddKey(t, rotation.x);
+                    footCurves[prefix + "Q.y"].AddKey(t, rotation.y);
+                    footCurves[prefix + "Q.z"].AddKey(t, rotation.z);
+                    footCurves[prefix + "Q.w"].AddKey(t, rotation.w);
+                }
             }
             handler.Dispose();
             foreach (var (t, p, r) in all)
@@ -376,11 +415,18 @@ namespace NineToFight.EditorTools
                 t.localRotation = r;
             }
 
+            // The model's cycles are meant to loop but their last frame doesn't always match the first (the run's
+            // left foot lands a little high), which pops once a cycle. Ease the last few frames onto the first.
+            foreach (var curve in muscleCurves.Values.Concat(footCurves.Values).Append(rootCurves["RootT.y"]))
+                CloseLoop(curve, 4);
+
             var clip = new AnimationClip { name = name, frameRate = 30f };
             foreach (var kv in rootCurves)
                 AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), kv.Key), kv.Value);
             foreach (var kv in muscleCurves)
                 AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), HumanTrait.MuscleName[kv.Key]), kv.Value);
+            foreach (var kv in footCurves)
+                AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), kv.Key), kv.Value);
             var settings = AnimationUtility.GetAnimationClipSettings(clip);
             settings.loopTime = true;
             settings.loopBlendOrientation = true;
@@ -392,7 +438,14 @@ namespace NineToFight.EditorTools
             AnimationUtility.SetAnimationClipSettings(clip, settings);
 
             string assetPath = $"{GeneratedClipsDir}/{name}.anim";
-            AssetDatabase.DeleteAsset(assetPath);
+            var existing = AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath);
+            if (existing != null)
+            {
+                EditorUtility.CopySerialized(clip, existing);
+                Object.DestroyImmediate(clip);
+                EditorUtility.SetDirty(existing);
+                return existing;
+            }
             AssetDatabase.CreateAsset(clip, assetPath);
             return clip;
         }

@@ -27,8 +27,16 @@ namespace NineToFight.Enemies
         static readonly Color TelegraphColor = new Color(1f, 0.6f, 0.15f);
         static readonly Color BossTelegraphColor = new Color(1f, 0.15f, 0.1f);
 
-        /// <summary>How many regular coworkers may press the attack at once; the rest circle and wait their turn.</summary>
+        /// <summary>
+        /// Attack slots: how many coworkers may press the attack at once; the rest circle and wait their turn.
+        /// Every attack (swing, throw, charge, boss slam) needs a slot. Bosses always get one, but it counts.
+        /// </summary>
         public const int MaxAttackers = 2;
+        static readonly List<EnemyBrain> SlotHolders = new List<EnemyBrain>();
+        /// <summary>Coworkers currently holding an attack slot.</summary>
+        public static IReadOnlyList<EnemyBrain> AttackSlots { get { PruneSlots(); return SlotHolders; } }
+        /// <summary>A slot held this long without swinging goes back to the pool.</summary>
+        const float SlotPatience = 3f;
         const float StandoffDistance = 3.2f;
 
         [SerializeField] WorkerClass workerClass;
@@ -53,6 +61,7 @@ namespace NineToFight.Enemies
         float buffedUntil;
         bool chargeHit;
         Coroutine roleRoutine;
+        float slotTakenAt, nextSlotTime;
 
         public WorkerClass WorkerClass => workerClass;
         public CharacterMotor2_5D Motor { get; private set; }
@@ -68,6 +77,9 @@ namespace NineToFight.Enemies
         public bool IsElite { get; set; }
         public bool IsBuffed => Time.time < buffedUntil;
         public bool IsGuarding => Role == EnemyRole.Guard && Time.time >= guardBrokenUntil && !Attack.IsAttacking && !IsStunned;
+        public bool HasAttackSlot => SlotHolders.Contains(this);
+        /// <summary>Committed to an attack that a hit can't stop: the boss slam.</summary>
+        public bool IsArmored => Attack.IsAttacking && bossSlam != null && Attack.Current == bossSlam;
 
         static readonly Color BlockColor = new Color(0.7f, 0.85f, 1f);
         static readonly Color RallyColor = new Color(0.95f, 0.55f, 0.75f);
@@ -96,6 +108,8 @@ namespace NineToFight.Enemies
             Health.Died += OnDied;
             Health.ModifyIncoming = GuardIncoming;
             Attack.HitLanded += (_, move) => { if (move == chargeMove) chargeHit = true; };
+            // One swing per turn: give the slot back so the next coworker can step in.
+            Attack.AttackEnded += () => ReleaseSlot(UnityEngine.Random.Range(0.6f, 1.2f));
             Attack.AttackStarted += move =>
             {
                 bool slam = move == bossSlam;
@@ -106,7 +120,11 @@ namespace NineToFight.Enemies
         }
 
         void OnEnable() => Active.Add(this);
-        void OnDisable() => Active.Remove(this);
+        void OnDisable()
+        {
+            Active.Remove(this);
+            ReleaseSlot(0f);
+        }
 
         public void Configure(WorkerClass value)
         {
@@ -148,9 +166,24 @@ namespace NineToFight.Enemies
             if (Visual != null) Visual.SetColors(workerClass.shirtColor, workerClass.tieColor);
             // Same job title, different person: vary looks per coworker; management wears suits.
             var look = Visual != null ? Visual.GetComponent<CharacterLook>() : null;
-            if (look != null) look.Apply(CharacterLook.Seed(workerClass.displayName) ^ GetInstanceID(), workerClass.tier >= 3 || Boss != Game.BossRank.None);
+            if (look != null) look.Apply(LookSeed(), workerClass.tier >= 3 || Boss != Game.BossRank.None);
             if (HeldItem != null) HeldItem.SetIdleProp(attackMove.prop);
             BuildRoleMoves();
+        }
+
+        /// <summary>
+        /// Same job title, same spot, same floor: same person, every run. Varies with where they stand and
+        /// the floor so a room of Interns isn't a room of twins.
+        /// </summary>
+        int LookSeed()
+        {
+            var p = transform.position;
+            int floor = GameFlow.Instance != null ? GameFlow.Instance.Floor : 1;
+            unchecked
+            {
+                return CharacterLook.Seed(workerClass.displayName) ^ (Mathf.RoundToInt(p.x * 4f) * 73856093) ^
+                       (Mathf.RoundToInt(p.z * 4f) * 19349663) ^ (floor * 83492791);
+            }
         }
 
         void BuildRoleMoves()
@@ -197,9 +230,12 @@ namespace NineToFight.Enemies
             }
             if (!canAct || Time.time < stunnedUntil || Attack.IsAttacking)
             {
+                if (!canAct || Time.time < stunnedUntil) ReleaseSlot(0.4f);
                 Motor.SetMoveInput(Vector2.zero);
                 return;
             }
+            // A slot that isn't being used goes back to the pool.
+            if (HasAttackSlot && Time.time - slotTakenAt > SlotPatience) ReleaseSlot(1f);
 
             Vector3 toPlayer = player.transform.position - transform.position;
             if (!aggro && Mathf.Abs(toPlayer.x) <= workerClass.aggroRange)
@@ -230,7 +266,7 @@ namespace NineToFight.Enemies
             bool inRange = Mathf.Abs(toPlayer.x) <= desired + 0.35f && Mathf.Abs(dz) <= laneTolerance;
 
             // Bosses leap in from mid-range with a heavily telegraphed slam.
-            if (bossSlam != null && Time.time >= nextSlamTime && Mathf.Abs(toPlayer.x) < 7f && Mathf.Abs(dz) < 1.2f)
+            if (bossSlam != null && Time.time >= nextSlamTime && Mathf.Abs(toPlayer.x) < 7f && Mathf.Abs(dz) < 1.2f && TryTakeSlot())
             {
                 Motor.SetMoveInput(Vector2.zero);
                 if (Attack.TryAttack(bossSlam))
@@ -242,7 +278,7 @@ namespace NineToFight.Enemies
             }
 
             // Only a couple of coworkers press the attack; the rest hang back and circle.
-            if (Boss == Game.BossRank.None && !MayAttack(player.transform.position))
+            if (!TryTakeSlot())
             {
                 float holdX = toPlayer.x - side * Mathf.Max(StandoffDistance, desired + 1.8f);
                 float wobble = Mathf.Sin(Time.time * 0.9f + GetInstanceID()) * 1.6f * circleSign;
@@ -277,7 +313,7 @@ namespace NineToFight.Enemies
                 case EnemyRole.Thrower:
                 {
                     // Keep 5-7 m away in the player's lane; throw when lined up.
-                    if (Time.time >= nextSpecialTime && lined && distance > 2.5f && distance < 11f)
+                    if (Time.time >= nextSpecialTime && lined && distance > 2.5f && distance < 11f && TryTakeSlot())
                     {
                         Motor.SetMoveInput(Vector2.zero);
                         if (Attack.TryAttack(throwMove))
@@ -315,7 +351,7 @@ namespace NineToFight.Enemies
 
                 case EnemyRole.Charger:
                 {
-                    if (Time.time >= nextSpecialTime && Mathf.Abs(dz) < 0.7f && distance > 3f && distance < 9f)
+                    if (Time.time >= nextSpecialTime && Mathf.Abs(dz) < 0.7f && distance > 3f && distance < 9f && TryTakeSlot())
                     {
                         Motor.SetMoveInput(Vector2.zero);
                         if (Attack.TryAttack(chargeMove))
@@ -393,6 +429,8 @@ namespace NineToFight.Enemies
             foreach (var other in Active.ToArray())
             {
                 if (other == this || other.Health.IsDead || (other.transform.position - transform.position).sqrMagnitude > 49f) continue;
+                // Rallies lift the rank and file: no healing a boss back up, and no Supports healing each other forever.
+                if (other.Boss != Game.BossRank.None || other.Role == EnemyRole.Support) continue;
                 other.Health.Heal(other.Health.Max * 0.25f);
                 other.buffedUntil = Time.time + 5f;
                 other.Attack.BuffDamageMultiplier = 1.3f;
@@ -447,19 +485,27 @@ namespace NineToFight.Enemies
             }
         }
 
-        /// <summary>True if this coworker is among the closest few allowed to engage.</summary>
-        bool MayAttack(Vector3 playerPosition)
+        // ------------------------------------------------------------------ attack slots
+
+        static void PruneSlots() => SlotHolders.RemoveAll(e => e == null || !e.isActiveAndEnabled || e.Health == null || e.Health.IsDead);
+
+        /// <summary>Claims (or keeps) an attack slot. Bosses always get one; everyone else waits for a free one.</summary>
+        bool TryTakeSlot()
         {
-            float mine = (transform.position - playerPosition).sqrMagnitude;
-            int closer = 0;
-            foreach (var other in Active)
-            {
-                if (other == this || !other.aggro || other.Boss != Game.BossRank.None || other.Health.IsDead) continue;
-                if (other.Role == EnemyRole.Thrower || other.Role == EnemyRole.Support) continue;
-                float theirs = (other.transform.position - playerPosition).sqrMagnitude;
-                if (theirs < mine || (theirs == mine && other.GetInstanceID() < GetInstanceID())) closer++;
-            }
-            return closer < MaxAttackers;
+            if (HasAttackSlot) return true;
+            if (Time.time < nextSlotTime && Boss == Game.BossRank.None) return false;
+            PruneSlots();
+            if (Boss == Game.BossRank.None && SlotHolders.Count >= MaxAttackers) return false;
+            SlotHolders.Add(this);
+            slotTakenAt = Time.time;
+            return true;
+        }
+
+        /// <summary>Hands the slot back; this coworker waits <paramref name="rest"/> seconds before asking again.</summary>
+        void ReleaseSlot(float rest)
+        {
+            if (!SlotHolders.Remove(this)) return;
+            nextSlotTime = Time.time + rest;
         }
 
         string SlamQuote()
@@ -495,15 +541,28 @@ namespace NineToFight.Enemies
                 GameFlow.HitStop(info.hitStop);
                 return;
             }
-            if (roleRoutine != null && Attack.IsAttacking) StopCoroutine(roleRoutine);
+            if (IsArmored)
+            {
+                // Hyper armour: the slam is committed. The hit lands (damage, flash, freeze) but doesn't stop it.
+                if (Visual != null) Visual.Flash(Color.white, 0.08f);
+                GameFlow.HitStop(info.hitStop);
+                return;
+            }
             float poise = workerClass != null ? workerClass.poise : 0f;
-            if (poise < 0.99f) Attack.Interrupt();
-            stunnedUntil = Time.time + hitStun * (1f - poise);
+            if (poise < 0.99f)
+            {
+                if (roleRoutine != null && Attack.IsAttacking) StopCoroutine(roleRoutine);
+                Attack.Interrupt();
+                Motor.CancelDash(); // a charger knocked out of its bull-rush stops rushing
+            }
+            // Keep the longer freeze: a hit mustn't shorten a Blue Screen or a winded stagger.
+            float stun = hitStun * (1f - poise);
+            stunnedUntil = Mathf.Max(stunnedUntil, Time.time + stun);
             Motor.AddImpulse(info.knockback * (1f - poise * 0.6f));
             if (Visual != null)
             {
                 Visual.Flash(Color.white, 0.08f);
-                Visual.PlayHitReaction(info.knockback);
+                Visual.PlayHitReaction(info.knockback, stun);
             }
             GameFlow.HitStop(info.hitStop);
         }

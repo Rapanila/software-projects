@@ -52,8 +52,6 @@ namespace NineToFight.UI
 
         // ================================================================ public API
 
-        public void SetEndingText(string text) => endingBody.text = text;
-
         public void SetEndingText(string title, string body, string prompt)
         {
             endingTitle.text = title;
@@ -481,7 +479,13 @@ namespace NineToFight.UI
             Place(prompts, new Vector2(0f, 0f), new Vector2(0.6f, 0f), new Vector2(118f, 40f), new Vector2(0f, 80f));
             var version = Label("Version", screen, "Version " + Application.version, 16, TextAnchor.LowerRight, UiKit.Muted, Face.Body);
             Place(version.rectTransform, new Vector2(0.6f, 0f), new Vector2(1f, 0f), new Vector2(0f, 30f), new Vector2(-36f, 60f));
+            // Woman_Suit is CC-BY 3.0 (the other characters are CC0): the licence requires this credit.
+            var credits = Label("Credits", screen, CreditsLine, 15, TextAnchor.LowerRight, UiKit.Muted, Face.Body);
+            Place(credits.rectTransform, new Vector2(0.4f, 0f), new Vector2(1f, 0f), new Vector2(0f, 60f), new Vector2(-36f, 86f));
         }
+
+        /// <summary>Third-party credits shown on the title screen.</summary>
+        public const string CreditsLine = "Characters by Quaternius (quaternius.com), CC0 and CC-BY 3.0.  Fonts: Barlow Condensed, IBM Plex Sans (OFL).";
 
         void BuildClassSelect(RectTransform parent)
         {
@@ -572,7 +576,7 @@ namespace NineToFight.UI
             string[] rows =
             {
                 "A D|Move", "W S|Change lane", "Space|Jump", "Shift|Dodge", "1 2 3|Attacks (to 0)", "J K I U|Light, heavy, special, super",
-                "Q|Department ability", "Esc|Pause", "M|Mute",
+                "Q|Department ability", "Esc|Pause", "M|Mute", "LT+X Y B A RB RT|Gamepad hotbar 1-6",
             };
             for (int i = 0; i < rows.Length; i++)
             {

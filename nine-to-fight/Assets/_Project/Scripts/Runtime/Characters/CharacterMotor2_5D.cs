@@ -46,6 +46,7 @@ namespace NineToFight.Characters
         Vector3 dashVelocity;
         float dashUntil;
         bool facingLocked;
+        float arenaMin = float.NegativeInfinity, arenaMax = float.PositiveInfinity;
 
         /// <summary>Last left/right facing (+1 / -1); used for camera look-ahead.</summary>
         public int Facing { get; private set; }
@@ -59,7 +60,8 @@ namespace NineToFight.Characters
         public float BuffSpeedMultiplier { get; set; } = 1f;
         /// <summary>Permanent run bonus (perks).</summary>
         public float PerkSpeedMultiplier { get; set; } = 1f;
-        public Vector3 Velocity => planarVelocity + externalVelocity + Vector3.up * verticalVelocity;
+        /// <summary>How the body is actually moving this frame, the dodge dash included.</summary>
+        public Vector3 Velocity => (IsDashing ? dashVelocity : planarVelocity + externalVelocity) + Vector3.up * verticalVelocity;
         public Transform Visual => visual;
 
         void Awake()
@@ -122,6 +124,22 @@ namespace NineToFight.Characters
         /// <summary>Keeps the current facing during attacks so input can't spin the character mid-swing.</summary>
         public void LockFacing(bool locked) => facingLocked = locked;
 
+        /// <summary>Fences the body between two x positions (the arena lock); it can't walk, dash or be knocked out.</summary>
+        public void SetArena(float min, float max)
+        {
+            arenaMin = min;
+            arenaMax = max;
+        }
+
+        public void ClearArena()
+        {
+            arenaMin = float.NegativeInfinity;
+            arenaMax = float.PositiveInfinity;
+        }
+
+        /// <summary>Ends a dash early (e.g. a charger hit mid-rush).</summary>
+        public void CancelDash() => dashUntil = 0f;
+
         public void Stop()
         {
             moveInput = Vector2.zero;
@@ -166,6 +184,10 @@ namespace NineToFight.Characters
             // Keep everyone inside the depth lane without fighting the CharacterController.
             float z = transform.position.z;
             delta.z = Mathf.Clamp(z + delta.z, minDepth, maxDepth) - z;
+            // The arena's walls only stop movement outward, so someone caught outside is never yanked back in.
+            float x = transform.position.x;
+            if (delta.x > 0f && x + delta.x > arenaMax) delta.x = Mathf.Max(0f, arenaMax - x);
+            if (delta.x < 0f && x + delta.x < arenaMin) delta.x = Mathf.Min(0f, arenaMin - x);
 
             controller.Move(delta);
             externalVelocity = Vector3.MoveTowards(externalVelocity, Vector3.zero, knockbackDrag * dt);

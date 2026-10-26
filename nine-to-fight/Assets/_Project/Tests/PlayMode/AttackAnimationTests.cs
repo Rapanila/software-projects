@@ -55,15 +55,18 @@ namespace NineToFight.Tests
                     var move = player.Progression.State.HotbarMove(slot);
                     yield return new WaitForSeconds(0.3f);
                     Vector3 restHand = body.InverseTransformPoint(hand.position);
+                    Quaternion grip = Quaternion.Inverse(hand.rotation) * socket.rotation;
 
                     Assert.IsTrue(player.Attack.TryAttack(move), $"{move.displayName} starts");
                     // Track how far the weapon hand travels from the wind-up to the impact.
                     float travelled = 0f;
                     Vector3 last = body.InverseTransformPoint(hand.position);
-                    float impact = AttackPoses.ImpactTime(move.startup, move.active);
+                    float impact = FightingMove.ImpactTime(move.startup, move.active);
                     for (float t = 0f; t < impact; t += Time.deltaTime)
                     {
                         yield return null;
+                        Assert.Less(Quaternion.Angle(grip, Quaternion.Inverse(hand.rotation) * socket.rotation),
+                            0.1f, $"{move.displayName}: the item must not twist inside the hand");
                         Vector3 now = body.InverseTransformPoint(hand.position);
                         travelled += (now - last).magnitude;
                         last = now;
@@ -76,6 +79,8 @@ namespace NineToFight.Tests
                     ScreenCapture.CaptureScreenshot(Path.Combine(ScreenshotDir, $"{playerClass.name}_{slot + 1}_{move.style}.png"));
                     yield return new WaitForSeconds(move.TotalDuration - impact + 0.1f);
                     Assert.IsFalse(player.Attack.IsAttacking);
+                    Assert.Less(Quaternion.Angle(grip, Quaternion.Inverse(hand.rotation) * socket.rotation),
+                        0.1f, $"{move.displayName}: recovery preserves the grip");
                 }
             }
         }

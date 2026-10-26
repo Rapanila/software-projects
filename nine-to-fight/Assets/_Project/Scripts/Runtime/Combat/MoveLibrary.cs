@@ -47,6 +47,8 @@ namespace NineToFight.Combat
             damage = 12f, reach = 1.2f, radius = 1.5f, knockback = 7f, knockUp = 3f,
             startup = 0.2f, active = 0.08f, recovery = 0.22f, cooldown = 5f, lunge = 1.5f, hitStop = 0.06f, hits = 3,
             combo = new[] { AttackStyle.Sweep, AttackStyle.Hurl },
+            // Each memo flies down the lane through everyone in its way.
+            throwSpeed = 13f, pierce = true,
         };
 
         public static readonly IReadOnlyList<FightingMove> All = new[]
